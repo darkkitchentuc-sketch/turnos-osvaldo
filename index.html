@@ -37,7 +37,7 @@
 *{box-sizing:border-box}
 html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45}
-.wrap{max-width:1280px;margin:0 auto;padding-block:16px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
+.wrap{max-width:1680px;margin:0 auto;padding-block:16px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
 header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;justify-content:space-between}
 .brand{display:flex;align-items:baseline;gap:10px}
 .brand h1{font-family:var(--f-display);font-weight:800;font-size:1.6rem;margin:0;letter-spacing:-.01em}
@@ -113,6 +113,20 @@ thead th{font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:va
 img{max-width:100%}
 [hidden]{display:none!important}
 main{min-width:0}
+/* Planificar: la semana entera entra en una pantalla de compu */
+.plan{table-layout:fixed;min-width:860px}
+.plan th.puesto,.plan td.puesto{width:118px;min-width:0;font-size:.8rem;padding:4px 6px}
+.plan th.day{font-size:.68rem;letter-spacing:.03em;padding:4px 2px}
+.plan th.day .tag{font-size:.58rem;margin-left:2px;padding:0 3px}
+.plan th.sub{font-size:.6rem;letter-spacing:.02em;padding:3px 1px}
+.plan td.cell{min-width:0;padding:2px}
+.plan .chip{padding:2px 4px;margin-bottom:2px;font-size:.72rem;line-height:1.15}
+.plan .chip b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plan .chip .mono{font-size:.64rem}
+.plan .add{padding:0;font-size:.7rem;line-height:1.3}
+.plan .falta{font-size:.6rem;margin-bottom:1px}
+.plan .notebtn{font-size:.64rem;padding:2px 3px}
+.plan .count td{font-size:.68rem;padding:3px 2px}
 main > section{grid-template-columns:minmax(0,1fr)}
 .team td.pc{padding:0}
 .tcell{display:block;width:100%;min-height:42px;border:none;border-radius:0;background:transparent;color:inherit;padding:6px 8px;font:inherit;text-align:center}
@@ -321,6 +335,7 @@ function weekNotas(w){return S.weeks[w]?.notas||{}}
 function ausente(sid,date){return S.ausencias.find(x=>x.s===sid&&x.from<=date&&date<=x.to)}
 function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>t.hidden=true,2600)}
 function sortedStaff(){return [...S.staff].sort((a,b)=>a.name.localeCompare(b.name,"es"))}
+function shortName(n){const w=n.trim().split(/\s+/);return w.length>1?w[0]+" "+w[1][0]+".":n}
 function shiftLabel(a){return `${shortT(a.in)} a ${a.out?shortT(a.out)+"hs":"cierre"}`}
 function dname(day){return day<0?DAYS[day+7].toLowerCase()+" anterior":DAYS[day].toLowerCase()}
 
@@ -390,13 +405,14 @@ function whenTxt(w,a){return `${DSH[a.d]} ${fmtDM(addDays(w,a.d))} ${TNAME[a.t].
 
 /* ---------- vistas ---------- */
 function render(){
-  if(!S.canWrite&&EDIT_VIEWS.includes(S.view))S.view="calendario";
+  // Sin permiso de edición se muestra el calendario, pero se recuerda la pestaña pedida para cuando termine de ingresar.
+  const view=!S.canWrite&&EDIT_VIEWS.includes(S.view)?"calendario":S.view;
   document.body.classList.toggle("solo",S.solo);document.body.classList.toggle("ro",!S.canWrite);renderAuth();
-  document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.view===S.view));
+  document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.view===view));
   document.getElementById("weekLabel").textContent=fmtDM(S.week)+" – "+fmtDM(addDays(S.week,6));
   const m=document.getElementById("main");
-  m.innerHTML=({semana:viewSemana,calendario:viewCalendario,equipo:viewEquipo,mi:viewMi,ausencias:viewAusencias,personas:viewPersonas,horas:viewHoras,ajustes:viewAjustes,historial:viewHistorial})[S.view]();
-  if(S.view==="equipo")drawPreview();
+  m.innerHTML=({semana:viewSemana,calendario:viewCalendario,equipo:viewEquipo,mi:viewMi,ausencias:viewAusencias,personas:viewPersonas,horas:viewHoras,ajustes:viewAjustes,historial:viewHistorial})[view]();
+  if(view==="equipo")drawPreview();
   renderModal();
 }
 function locButtons(){return `<div class="locs">${S.config.locations.map(l=>`<button data-loc="${l.id}" aria-pressed="${l.id===S.loc}">${esc(l.name)}</button>`).join("")}</div>`}
@@ -428,7 +444,7 @@ function viewSemana(){
         const here=list.filter(a=>a.p===p.id&&a.d===d&&a.t===t);
         const miss=av.short.get(`${S.loc}|${p.id}|${d}|${t}`);
         body+=`<td class="cell ${t} ${t==="a"?"first":""} ${miss?"short":""}">${miss?`<span class="falta">Falta ${miss}</span>`:""}${here.map(a=>
-          `<button class="chip ${t} ${chipClass(a,av)}" data-edit="${a.id}"><b>${esc(pname(a.s))}</b><span class="mono">${esc(shortT(a.in))}–${a.out?esc(shortT(a.out)):"cierre"}</span></button>`).join("")}
+          `<button class="chip ${t} ${chipClass(a,av)}" data-edit="${a.id}" title="${esc(pname(a.s))} · ${esc(a.in)} a ${a.out?esc(a.out):"cierre"}"><b>${esc(shortName(pname(a.s)))}</b><span class="mono">${esc(shortT(a.in))}${a.out?"–"+esc(shortT(a.out)):""}</span></button>`).join("")}
           <button class="add" data-add="${p.id}|${d}|${t}" aria-label="Agregar en ${esc(p.name)}, ${DAYS[d]} ${TNAME[t].toLowerCase()}">+</button></td>`;
       }
       body+="</tr>";
