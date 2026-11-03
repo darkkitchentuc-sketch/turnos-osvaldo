@@ -1,0 +1,9 @@
+{
+  "name": "Turnos Osvaldo",
+  "short_name": "Turnos",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#F3F5F4",
+  "theme_color": "#16302D",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
