@@ -37,7 +37,7 @@
 *{box-sizing:border-box}
 html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45}
-.wrap{max-width:1280px;margin:0 auto;padding-block:16px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:16px}
+.wrap{max-width:1280px;margin:0 auto;padding-block:16px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
 header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;justify-content:space-between}
 .brand{display:flex;align-items:baseline;gap:10px}
 .brand h1{font-family:var(--f-display);font-weight:800;font-size:1.6rem;margin:0;letter-spacing:-.01em}
@@ -110,6 +110,15 @@ thead th{font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:va
 .team td.c.w{background:var(--dinner);color:var(--dinner-ink)}
 .team td.off{background:var(--off);color:var(--off-ink);font-weight:600;font-size:.78rem}
 .team td.else{background:var(--line);color:var(--muted);font-size:.75rem}
+img{max-width:100%}
+[hidden]{display:none!important}
+main{min-width:0}
+main > section{grid-template-columns:minmax(0,1fr)}
+.team td.pc{padding:0}
+.tcell{display:block;width:100%;min-height:42px;border:none;border-radius:0;background:transparent;color:inherit;padding:6px 8px;font:inherit;text-align:center}
+.tcell small{display:block;opacity:.75;font-size:.72rem}
+body:not(.ro) .tcell:hover{outline:2px solid var(--accent);outline-offset:-2px}
+body.ro .tcell{cursor:default}
 .team td.day{font-family:var(--f-display);font-weight:600;text-align:left}
 .preview img{border:1px solid var(--line);border-radius:8px;display:block}
 
@@ -496,13 +505,14 @@ function viewEquipo(){
   let rows="";
   for(let d=0;d<7;d++)for(const t of ["a","c"]){
     rows+=`<tr>${t==="a"?`<td class="day" rowspan="2">${DAYS[d]}<br><span class="hint">${fmtDM(addDays(S.week,d))}${especial(S.week,d)?" · "+esc(especial(S.week,d)):""}</span></td>`:""}<td>${TNAME[t]}</td>`;
-    for(const s of cols){const c=teamCell(s.id,S.loc,d,t,S.week);rows+=`<td class="${t} ${c.kind}">${esc(c.text)}${c.sub?`<small>${esc(c.sub)}</small>`:""}</td>`}
+    for(const s of cols){const c=teamCell(s.id,S.loc,d,t,S.week);rows+=`<td class="${t} ${c.kind} pc"><button class="tcell" data-pcell="${s.id}|${d}|${t}" aria-label="${esc(s.name)}, ${DAYS[d]} ${TNAME[t].toLowerCase()}">${esc(c.text)}${c.sub?`<small>${esc(c.sub)}</small>`:""}</button></td>`}
     rows+=`<td class="mono">${shortT(cierre(S.loc,d,t))} hs</td></tr>`;
   }
   return `<section style="display:grid;gap:12px">
     <div class="bar">${locButtons()}<div class="group"><button class="primary" id="saveImg">Descargar imagen para WhatsApp</button><button id="copyImg">Copiar imagen</button><button id="xlsx">Descargar Excel</button></div></div>
     ${cols.length?`<div class="scroll"><table class="team"><thead><tr><th>Día</th><th>Turno</th>${cols.map(s=>`<th>${esc(s.name)}</th>`).join("")}<th>Cierre cocina</th></tr></thead><tbody>${rows}</tbody></table></div>`
       :`<div class="panel empty">Todavía no hay personas en ${esc(L.name)}. Sumalas en <b>Personas y puestos</b>.</div>`}
+    <p class="hint" data-editonly>Tocá una celda para cargar o cambiar el turno de esa persona. "Marcar OFF" lo quita.</p>
     <div class="panel preview"><h3>Así se ve la imagen</h3><p class="hint">En el celular podés mantener apretada la imagen para guardarla o compartirla.</p><img id="previewImg" alt="Horario de ${esc(L.name)} de la semana ${fmtDM(S.week)}"></div>
   </section>`;
 }
@@ -710,7 +720,10 @@ function modalShift(e){
   const opt=s=>{const au=ausente(s.id,date);return `<option value="${s.id}" ${s.id===a.s?"selected":""} ${au&&s.id!==a.s?"disabled":""}>${esc(s.name)}${au?" · "+TIPOS[au.tipo].toLowerCase():busy.has(s.id)?" · ya tiene turno":""}</option>`};
   const au=a.s&&ausente(a.s,date);
   return `<div class="overlay" data-close="1"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="mt">
-    <h2 id="mt">${esc(P?.name||"")} · ${esc(L?.name||"")}</h2>
+    ${e.byPerson?`<h2 id="mt">${esc(pname(a.s))} · ${DAYS[a.d]} ${TNAME[a.t].toLowerCase()}</h2>
+    <div class="row"><label>Locación<select id="mLoc">${S.config.locations.map(l=>`<option value="${l.id}" ${l.id===a.loc?"selected":""}>${esc(l.name)}</option>`).join("")}</select></label>
+      <label>Puesto<select id="mPuesto">${(()=>{const mine=person(a.s)?.puestos||[];const ps=[...(L?.puestos||[])].sort((x,y)=>mine.includes(a.loc+":"+y.id)-mine.includes(a.loc+":"+x.id));return ps.map(x=>`<option value="${x.id}" ${x.id===a.p?"selected":""}>${esc(x.name)}${mine.includes(a.loc+":"+x.id)?"":" (no es su puesto)"}</option>`).join("")})()}</select></label></div>`
+    :`<h2 id="mt">${esc(P?.name||"")} · ${esc(L?.name||"")}</h2>`}
     <p class="hint">${DAYS[a.d]} ${fmtDM(date)} · ${TNAME[a.t]} · cierre ${cierre(a.loc,a.d,a.t)}</p>
     <label>Persona<select id="mPerson"><option value="">Elegí a alguien</option>
       ${ok.length?`<optgroup label="Asignados a este puesto">${ok.map(opt).join("")}</optgroup>`:""}
@@ -723,7 +736,7 @@ function modalShift(e){
     ${au?`<div class="warnbox">${esc(pname(a.s))} tiene ${TIPOS[au.tipo].toLowerCase()} ese día.</div>`:""}
     ${clash.length?`<div class="warnbox">${esc(pname(a.s))} ya trabaja en ${clash.map(x=>`${esc(loc(x.loc).name)} (${esc(puesto(x.loc,x.p)?.name||"")}, ${x.in})`).join(" y ")} en ese horario.</div>`:""}
     ${a.s&&!(person(a.s)?.puestos||[]).includes(key)?`<p class="hint">${esc(pname(a.s))} no tiene este puesto en su ficha. Podés asignarlo igual.</p>`:""}
-    <div class="actions">${e.isNew?"":`<button class="danger" id="mDel">Quitar turno</button>`}<button id="mCancel">Cancelar</button><button class="primary" id="mSave" ${a.s?"":"disabled"}>Guardar</button></div>
+    <div class="actions">${e.isNew?"":`<button class="danger" id="mDel">${e.byPerson?"Marcar OFF":"Quitar turno"}</button>`}<button id="mCancel">Cancelar</button><button class="primary" id="mSave" ${a.s?"":"disabled"}>Guardar</button></div>
   </div></div>`;
 }
 function modalPerson(e){
@@ -772,8 +785,11 @@ function modalTpl(){
     <div class="actions"><button id="mCancel">Cancelar</button><button class="primary" id="tSave">Guardar</button></div>
   </div></div>`;
 }
+function defaultPuesto(sid,l){const mine=person(sid)?.puestos||[];const L=loc(l);return (L?.puestos.find(x=>mine.includes(l+":"+x.id))||L?.puestos[0])?.id||""}
 function readShiftForm(){
   const a=S.editing.a;
+  const ml=document.getElementById("mLoc"),mp=document.getElementById("mPuesto");
+  if(ml&&ml.value!==a.loc){a.loc=ml.value;a.p=defaultPuesto(a.s,a.loc)}else if(mp)a.p=mp.value;
   a.s=document.getElementById("mPerson").value;
   a.in=document.getElementById("mIn").value||a.in;
   const mode=document.getElementById("mOutMode").value;
@@ -940,7 +956,7 @@ document.addEventListener("click",e=>{
   const d=t.dataset;
   if(t.id==="login"){S.editing={type:"login"};renderModal();return}
   if(t.id==="logout"){S.db.auth.signOut();return}
-  const WRITE=d.add||d.edit||d.nota||d.person||d.padd||d.pdel||d.audel||d.espdel||d.tpldel||["copyPrev","tplApply","tplSave","newPerson","auAdd","espAdd"].includes(t.id);
+  const WRITE=d.add||d.edit||d.pcell||d.nota||d.person||d.padd||d.pdel||d.audel||d.espdel||d.tpldel||["copyPrev","tplApply","tplSave","newPerson","auAdd","espAdd"].includes(t.id);
   if(WRITE&&!S.canWrite){toast("Ingresá con tu usuario para editar.");return}
   const keepConfirm=t.id==="copyPrev"||t.id==="tplApply"||d.tpldel;if(!keepConfirm&&S.confirm){S.confirm=""}
   if(d.view){S.view=d.view;try{location.hash=d.view==="mi"&&S.miId?"mi-"+S.miId:d.view}catch{}render();return}
@@ -948,6 +964,12 @@ document.addEventListener("click",e=>{
   if(d.loc){S.loc=d.loc;render();return}
   if(t.id==="prevW"||t.id==="nextW"||t.id==="todayW"){S.week=t.id==="todayW"?mondayOf(new Date()):addDays(S.week,t.id==="prevW"?-7:7);render();return}
   if(d.add){const [p,dd,tt]=d.add.split("|");S.editing={type:"shift",isNew:true,a:{id:uid(),loc:S.loc,p,d:+dd,t:tt,s:"",in:S.config.entradas?.[tt]||(tt==="a"?"11:30":"19:30"),out:"",note:""}};renderModal();return}
+  if(d.pcell){const [sid,dd,tt]=d.pcell.split("|");const day=+dd;
+    const mine=weekAssign(S.week).filter(a=>a.s===sid&&a.d===day&&a.t===tt);
+    const a=mine.find(x=>x.loc===S.loc)||mine[0];
+    if(a){S.editing={type:"shift",byPerson:true,a:{...a}};renderModal();return}
+    const au=ausente(sid,addDays(S.week,day));if(au){toast(`${pname(sid)} tiene ${TIPOS[au.tipo].toLowerCase()} ese día.`);return}
+    S.editing={type:"shift",byPerson:true,isNew:true,a:{id:uid(),loc:S.loc,p:defaultPuesto(sid,S.loc),d:day,t:tt,s:sid,in:S.config.entradas?.[tt]||(tt==="a"?"11:30":"19:30"),out:"",note:""}};renderModal();return}
   if(d.edit){const a=weekAssign(S.week).find(x=>x.id===d.edit);if(a){S.editing={type:"shift",a:{...a}};renderModal()}return}
   if(t.id==="mCancel"){S.editing=null;renderModal();return}
   if(t.id==="mSave"){readShiftForm();const a=S.editing.a;if(!a.s)return;
@@ -1003,7 +1025,7 @@ document.addEventListener("click",e=>{
 });
 document.addEventListener("change",e=>{
   const t=e.target,d=t.dataset;
-  if(t.id==="mOutMode"||t.id==="mPerson"||t.id==="mIn"||t.id==="mOut"){readShiftForm();if(t.id==="mOutMode"&&t.value==="hora")S.editing.a.out=hhmm(toMin(cierre(S.editing.a.loc,S.editing.a.d,S.editing.a.t)));renderModal();
+  if(t.id==="mOutMode"||t.id==="mPerson"||t.id==="mIn"||t.id==="mOut"||t.id==="mLoc"||t.id==="mPuesto"){readShiftForm();if(t.id==="mOutMode"&&t.value==="hora")S.editing.a.out=hhmm(toMin(cierre(S.editing.a.loc,S.editing.a.d,S.editing.a.t)));renderModal();
     const f=document.getElementById(t.id);f&&f.focus();return}
   if(t.id==="miPick"){S.miId=t.value;try{location.hash=t.value?"mi-"+t.value:"mi"}catch{}render();return}
   if(t.id==="tplPick"){S.tplSel=t.value;S.confirm="";render();return}
