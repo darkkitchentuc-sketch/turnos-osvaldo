@@ -13,6 +13,12 @@ create table if not exists public.editores (
   email text primary key
 );
 
+-- Permisos de base (las reglas de abajo deciden qué filas ve y cambia cada uno).
+grant usage on schema public to anon, authenticated;
+grant select on public.docs to anon, authenticated;
+grant insert, update, delete on public.docs to authenticated;
+grant select on public.editores to authenticated;
+
 alter table public.docs enable row level security;
 alter table public.editores enable row level security;
 
