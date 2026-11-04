@@ -4,7 +4,10 @@
 // 3) Implementar → Nueva implementación → tipo "Aplicación web".
 //    Ejecutar como: Yo. Quién tiene acceso: Cualquier usuario. → Implementar → Autorizar acceso.
 // 4) Copiá la "URL de la aplicación web" y pegala en la app, en Aprobación de cambios → Aviso por mail.
-// El mail siempre llega a la cuenta dueña de este script; nadie puede usarlo para escribirle a otra dirección.
+// Por defecto el mail llega a la cuenta dueña de este script. Para mandarlo a otras casillas, escribilas abajo
+// separadas por coma (ej.: "uno@gmail.com, otro@gmail.com") y publicá una versión nueva:
+// Implementar → Gestionar implementaciones → lápiz → Versión: Nueva versión → Implementar. El link no cambia.
+var DESTINOS = "";
 
 function doPost(e) {
   var d = JSON.parse((e && e.postData && e.postData.contents) || "{}");
@@ -13,7 +16,7 @@ function doPost(e) {
     return "<tr><td style='padding:6px 10px;font-weight:bold;vertical-align:top'>" + esc(k) +
            "</td><td style='padding:6px 10px'>" + esc(String(d[k]).slice(0, 1000)) + "</td></tr>";
   }).join("");
-  MailApp.sendEmail({ to: Session.getEffectiveUser().getEmail(), subject: asunto, htmlBody: "<table>" + filas + "</table>" });
+  MailApp.sendEmail({ to: DESTINOS || Session.getEffectiveUser().getEmail(), subject: asunto, htmlBody: "<table>" + filas + "</table>" });
   return ContentService.createTextOutput("ok");
 }
 
