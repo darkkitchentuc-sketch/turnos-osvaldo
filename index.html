@@ -288,18 +288,19 @@ body.ro [data-editonly]{display:none}
   </header>
   <div id="banner" class="banner" hidden></div>
   <nav class="tabs" role="tablist">
-    <button role="tab" data-view="semana" data-editonly>Planificar semana</button>
+    <button role="tab" data-view="semana" hidden>Planificar semana</button>
     <button role="tab" data-view="calendario">Calendario</button>
-    <button role="tab" data-view="equipo">Horario del equipo</button>
+    <button role="tab" data-view="equipo" hidden>Horario del equipo</button>
     <button role="tab" data-view="mi">Mi horario</button>
     <button role="tab" data-view="cambios">Cambios de turno</button>
-    <button role="tab" data-view="ausencias" data-editonly>Ausencias</button>
-    <button role="tab" data-view="personas" data-editonly>Personas y puestos</button>
-    <button role="tab" data-view="horas" data-editonly>Horas y costos</button>
-    <button role="tab" data-view="fichadas" data-editonly>Fichadas</button>
-    <button role="tab" data-view="aprobar" data-editonly>Aprobación de cambios</button>
-    <button role="tab" data-view="ajustes" data-editonly>Ajustes</button>
-    <button role="tab" data-view="historial" data-editonly>Historial</button>
+    <button role="tab" data-view="fichar">Fichadas</button>
+    <button role="tab" data-view="ausencias" hidden>Ausencias</button>
+    <button role="tab" data-view="personas" hidden>Personas y puestos</button>
+    <button role="tab" data-view="horas" hidden>Horas y costos</button>
+    <button role="tab" data-view="fichadas" hidden>Control de fichadas</button>
+    <button role="tab" data-view="aprobar" hidden>Aprobación de cambios</button>
+    <button role="tab" data-view="ajustes" hidden>Ajustes</button>
+    <button role="tab" data-view="historial" hidden>Historial</button>
   </nav>
   <main id="main"></main>
 </div>
@@ -308,7 +309,9 @@ body.ro [data-editonly]{display:none}
 
 <script>
 const APP_URL=location.origin+location.pathname;
-const EDIT_VIEWS=["semana","ausencias","personas","horas","fichadas","aprobar","ajustes","historial"];
+/* Niveles: personal (sin usuario), encargado y administrador */
+const BASE_VIEWS=["calendario","mi","cambios","fichar"],ENC_VIEWS=[...BASE_VIEWS,"semana","equipo"];
+function canSee(v){return S.isAdmin||(S.canWrite?ENC_VIEWS:BASE_VIEWS).includes(v)}
 const DAYS=["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
 const DSH=["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
 const TURNOS=[{k:"a",name:"Almuerzo"},{k:"c",name:"Cena"}];
@@ -330,7 +333,7 @@ const DEFAULT_CONFIG={
 };
 const DEFAULT_CIERRE=[["15:00","23:59"],["15:00","23:59"],["15:00","23:59"],["15:00","23:59"],["15:30","00:30"],["15:30","00:30"],["16:00","23:59"]];
 
-const S={db:null,session:null,canWrite:false,me:"",live:false,config:structuredClone(DEFAULT_CONFIG),staff:[],weeks:{},ausencias:[],plantillas:[],hist:{},
+const S={db:null,session:null,canWrite:false,isAdmin:false,role:"",editores:[],me:"",live:false,config:structuredClone(DEFAULT_CONFIG),staff:[],weeks:{},ausencias:[],plantillas:[],hist:{},
   view:"semana",loc:"norte",calLoc:"all",week:mondayOf(new Date()),hours:{preset:"semana"},editing:null,confirm:"",miId:"",solo:false,fich:[],accesos:{},demoAcc:{},sol:[],cx:{dni:"",sid:"",mis:[],sel:"",tipo:"ceder",para:"",paraSel:"",nin:"",nout:"",motivo:"",busy:false}};
 
 /* ---------- utilidades ---------- */
@@ -458,7 +461,8 @@ async function delAcceso(sid){
   if(!S.db){delete S.demoAcc[sid];delete S.accesos[sid];return ""}
   const {error}=await S.db.from("accesos").delete().eq("staff_id",sid);if(error)return error.message;await loadFichero();return ""}
 async function loadFichero(){
-  if(!S.db||!S.canWrite){S.fich=[];S.accesos={};S.sol=[];return}
+  if(!S.db||!S.isAdmin){S.fich=[];S.accesos={};S.sol=[];S.editores=[];return}
+  const {data:eds}=await S.db.from("editores").select("email,rol").order("email");S.editores=eds||[];
   const since=new Date(Date.now()-120*864e5).toISOString();let all=[];
   for(let i=0;;i+=1000){const {data,error}=await S.db.from("fichadas").select("id,staff_id,tipo,at,origen,por").gte("at",since).order("at").range(i,i+999);if(error||!data)break;all=all.concat(data);if(data.length<1000)break}
   S.fich=all;
@@ -494,7 +498,8 @@ function whenTxt(w,a){return `${DSH[a.d]} ${fmtDM(addDays(w,a.d))} ${TNAME[a.t].
 /* ---------- vistas ---------- */
 function render(){
   // Sin permiso de edición se muestra el calendario, pero se recuerda la pestaña pedida para cuando termine de ingresar.
-  const view=!S.canWrite&&EDIT_VIEWS.includes(S.view)?"calendario":S.view;
+  const view=canSee(S.view)?S.view:"calendario";
+  document.querySelectorAll("nav.tabs button").forEach(b=>b.hidden=!canSee(b.dataset.view));
   document.body.classList.toggle("solo",S.solo);document.body.classList.toggle("kiosk",view==="fichar");document.body.classList.toggle("ro",!S.canWrite);renderAuth();
   document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.view===view));
   document.getElementById("weekLabel").textContent=fmtDM(S.week)+" – "+fmtDM(addDays(S.week,6));
@@ -641,7 +646,7 @@ function viewMi(){
   const people=sortedStaff().filter(p=>p.active!==false||p.id===S.miId);
   const id=person(S.miId)?S.miId:"";
   const pick=`<label class="row" style="gap:8px"><span class="hint">Persona</span><select id="miPick"><option value="">Elegí una persona</option>${people.map(p=>`<option value="${p.id}" ${p.id===id?"selected":""}>${esc(p.name)}</option>`).join("")}</select></label>`;
-  if(!id)return `<section style="display:grid;gap:12px"><div class="bar">${pick}</div><div class="panel empty">Elegí a alguien para ver sus turnos de esta semana y la próxima, con las notas y tareas de cada turno.</div></section>`;
+  if(!id)return `<section style="display:grid;gap:12px"><div class="bar">${pick}</div><div class="panel empty">Elegí a alguien para ver sus turnos de las próximas cuatro semanas, con las notas y tareas de cada turno.</div></section>`;
   const today=iso(new Date());
   const week=w=>{
     const days=miDays(id,w);
@@ -657,7 +662,7 @@ function viewMi(){
   return `<section style="display:grid;gap:12px">
     <div class="bar">${pick}<div class="group"><button class="primary" id="miImg">Descargar imagen</button><button id="miLink">Copiar link</button><button data-view="cambios">Pedir cambio de turno</button></div></div>
     <p class="hint" ${S.solo?"hidden":""}>El link abre directo en el horario de esta persona, sin usuario ni contraseña. Mandáselo por WhatsApp, o mandale la imagen.</p>
-    ${week(S.week)}${week(addDays(S.week,7))}
+    ${[0,1,2,3].map(i=>week(addDays(S.week,7*i))).join("")}
   </section>`;
 }
 
@@ -829,7 +834,7 @@ function solCheck(x){
   if(x.tipo==="cambio"){chk(x.para_staff,x.semana,A,[B.id]);chk(x.staff_id,x.para_semana,B,[A.id])}
   return {A,B,warns}}
 function viewAprobar(){
-  if(S.canWrite&&!avisoEmail()&&S.me){S.config.avisoEmail=S.me;saveConfig()}
+  if(S.isAdmin&&!avisoEmail()&&S.me){S.config.avisoEmail=S.me;saveConfig()}
   const pend=S.sol.filter(x=>x.estado==="pendiente"),res=S.sol.filter(x=>x.estado!=="pendiente").slice(0,30);
   const card=x=>{const c=solCheck(x);return `<div class="panel" style="display:grid;gap:8px">
     <div><b>${esc(pname(x.staff_id))}</b> <span class="hint">· ${esc(CTIPO[x.tipo])} · pedido el ${fmtDM(arParts(x.created_at).date)} ${arParts(x.created_at).hm}</span></div>
@@ -993,7 +998,16 @@ function viewHoras(){
 function viewAjustes(){
   const L=loc(S.loc);const cob=S.config.cobertura||{},R=S.config.reglas||{},vh=S.config.valorHora||{};
   const esp=Object.entries(S.config.especiales||{}).sort((a,b)=>a[0].localeCompare(b[0]));
+  const me=(S.me||"").toLowerCase();
+  const accesos=`<div class="panel"><h2>Accesos</h2>
+    <p class="hint">El personal no necesita usuario: ve Calendario, Mi horario, Cambios de turno y Fichadas. Un <b>encargado</b> además planifica la semana y arma el Horario del equipo. Un <b>administrador</b> ve todo, incluidos costos, aprobaciones y estos accesos.</p>
+    <div class="list">${S.editores.map(x=>`<div class="item"><span>${esc(x.email)}${x.email===me?` <span class="hint">(vos)</span>`:""}</span><span class="row">
+      <select data-rolchg="${esc(x.email)}" aria-label="Nivel de ${esc(x.email)}" ${x.email===me?"disabled":""}><option value="encargado" ${x.rol==="encargado"?"selected":""}>Encargado</option><option value="admin" ${x.rol==="admin"?"selected":""}>Administrador</option></select>
+      ${x.email===me?"":`<button class="ghost danger" data-eddel="${esc(x.email)}">${S.confirm==="eddel-"+x.email?"¿Quitar? Tocá de nuevo":"Quitar"}</button>`}</span></div>`).join("")}</div>
+    <div class="row" style="margin-top:10px"><input type="text" id="edEmail" inputmode="email" placeholder="mail@ejemplo.com" aria-label="Mail" style="flex:1 1 200px"><select id="edRol" aria-label="Nivel"><option value="encargado">Encargado</option><option value="admin">Administrador</option></select><button class="primary" id="edAdd">Dar acceso</button></div>
+    <p class="hint">Después creale el usuario en Supabase: <b>Authentication → Users → Add user → Create new user</b>, con ese mail y una contraseña, tildando <b>Auto Confirm User</b>. Pasale la contraseña; entra con el botón Ingresar.</p></div>`;
   return `<section style="display:grid;gap:12px">
+    ${accesos}
     <div class="bar">${locButtons()}<p class="hint">Cierres, cobertura y valor hora se configuran por locación.</p></div>
     <div class="grid2">
       <div class="panel"><h2>Cobertura mínima · ${esc(L.name)}</h2>
@@ -1371,9 +1385,9 @@ document.addEventListener("click",e=>{
   const d=t.dataset;
   if(t.id==="login"){S.editing={type:"login"};renderModal();return}
   if(t.id==="logout"){S.db.auth.signOut();return}
-  const WRITE=d.add||d.edit||d.pcell||d.nota||d.person||d.padd||d.pdel||d.audel||d.espdel||d.tpldel||d.fdel||d.apr||d.rej||["copyPrev","tplApply","tplSave","newPerson","auAdd","espAdd","fmAdd","avisoTest"].includes(t.id);
+  const WRITE=d.add||d.edit||d.pcell||d.nota||d.person||d.padd||d.pdel||d.audel||d.espdel||d.tpldel||d.fdel||d.apr||d.rej||d.eddel||["copyPrev","tplApply","tplSave","newPerson","auAdd","espAdd","fmAdd","avisoTest","edAdd"].includes(t.id);
   if(WRITE&&!S.canWrite){toast("Ingresá con tu usuario para editar.");return}
-  const keepConfirm=t.id==="copyPrev"||t.id==="tplApply"||d.tpldel||d.fdel;if(!keepConfirm&&S.confirm){S.confirm=""}
+  const keepConfirm=t.id==="copyPrev"||t.id==="tplApply"||d.tpldel||d.fdel||d.eddel;if(!keepConfirm&&S.confirm){S.confirm=""}
   if(d.view){S.view=d.view;try{location.hash=d.view==="mi"&&S.miId?"mi-"+S.miId:d.view}catch{}render();return}
   if(d.calloc){S.calLoc=d.calloc;render();return}
   if(d.loc){S.loc=d.loc;render();return}
@@ -1456,6 +1470,14 @@ document.addEventListener("click",e=>{
     else{const x=S.sol.find(s=>String(s.id)===d.cxcancel);if(x)x.estado="cancelada"}
     const m=await cxLoad(S.cx.dni);if(m.ok)S.cx.mis=m.solicitudes||[];render();toast("Pedido cancelado")})();return}
   if(d.apr){resolver(d.apr,true);return}
+  if(t.id==="edAdd"){const email=document.getElementById("edEmail").value.trim().toLowerCase(),rol=document.getElementById("edRol").value;
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){toast("Escribí un mail válido.");return}
+    if(S.editores.some(x=>x.email===email)){toast("Ese mail ya tiene acceso.");return}
+    (async()=>{if(S.db){const {error}=await S.db.from("editores").insert({email,rol});if(error){toast(/rol|column/.test(error.message)?"Falta correr niveles.sql en Supabase.":"No se pudo dar acceso: "+error.message,6000);return}}
+      S.editores=[...S.editores,{email,rol}].sort((a,b)=>a.email.localeCompare(b.email));log(`Dio acceso de ${rol==="admin"?"administrador":"encargado"} a ${email}.`);render();toast("Acceso dado. Falta crearle el usuario en Supabase.",5000)})();return}
+  if(d.eddel){if(S.confirm!=="eddel-"+d.eddel){S.confirm="eddel-"+d.eddel;render();return}S.confirm="";const email=d.eddel;
+    (async()=>{if(S.db){const {error}=await S.db.from("editores").delete().eq("email",email);if(error){toast("No se pudo quitar: "+error.message);return}}
+      S.editores=S.editores.filter(x=>x.email!==email);log(`Quitó el acceso de ${email}.`);render();toast("Acceso quitado")})();return}
   if(d.rej){resolver(d.rej,false);return}
   if(t.id==="avisoTest"){(async()=>{if(!avisoEmail()){toast("Escribí un email.");return}const r=await enviarAviso("Prueba de avisos de Turnos Osvaldo",{Mensaje:"Si te llegó este mail, los avisos de pedidos de cambio funcionan."});toast(r.ok?r.msg:"No se pudo mandar el mail: "+r.msg,9000)})();return}
   if(t.id==="fichLink"){copyText(APP_URL+"#fichar","Link copiado");return}
@@ -1489,6 +1511,8 @@ document.addEventListener("change",e=>{
   if(t.id==="cxTipo"){S.cx.tipo=t.value;render();return}
   if(t.id==="cxPara"){S.cx.para=t.value;S.cx.paraSel="";render();return}
   if(t.id==="cxParaSel"){S.cx.paraSel=t.value;return}
+  if(d.rolchg){const email=d.rolchg,rol=t.value;(async()=>{if(S.db){const {error}=await S.db.from("editores").update({rol}).eq("email",email);if(error){toast("No se pudo cambiar: "+error.message);render();return}}
+    const x=S.editores.find(e=>e.email===email);if(x)x.rol=rol;log(`Cambió a ${email} a ${rol==="admin"?"administrador":"encargado"}.`);toast("Nivel cambiado")})();return}
   if(t.id==="avisoEmail"){S.config.avisoEmail=t.value.trim();saveConfig();log("Cambió el email de avisos.");return}
 });
 document.addEventListener("input",e=>{const t=e.target;
@@ -1512,7 +1536,7 @@ document.addEventListener("submit",async e=>{
 (function(){
   const sync=document.getElementById("sync");
   const C=window.TURNOS_CONFIG||{};
-  if(!window.supabase||!C.supabaseUrl||C.supabaseUrl.includes("TU-PROYECTO")){S.canWrite=true;sync.textContent="Modo de prueba";showBanner("Todavía no está conectada la base de datos: lo que cargues acá no se guarda.");render();return}
+  if(!window.supabase||!C.supabaseUrl||C.supabaseUrl.includes("TU-PROYECTO")){S.canWrite=true;S.isAdmin=true;S.role="admin";S.editores=[{email:"admin@prueba",rol:"admin"}];sync.textContent="Modo de prueba";showBanner("Todavía no está conectada la base de datos: lo que cargues acá no se guarda.");render();return}
   const db=window.supabase.createClient(C.supabaseUrl,C.supabaseKey);S.db=db;
   function applyCache(){
     const cfg=cache.get("config/main");
@@ -1528,24 +1552,26 @@ document.addEventListener("submit",async e=>{
   async function loadAll(){
     const {data,error}=await db.from("docs").select("path,data");
     if(error){sync.textContent="Sin conexión";showBanner("No se pudieron cargar los horarios ("+error.message+"). Revisá tu conexión y recargá la página.");return}
-    cache.clear();data.forEach(r=>cache.set(r.path,r.data));S.live=true;sync.textContent=S.canWrite?"Guardado en la nube":"Solo lectura";showBanner("");applyCache();
+    cache.clear();data.forEach(r=>cache.set(r.path,r.data));S.live=true;sync.textContent=S.isAdmin?"Administrador":S.canWrite?"Encargado":"Personal";showBanner("");applyCache();
   }
   async function onSession(session){
-    S.session=session;S.me=session?.user?.email||"";S.canWrite=false;
-    if(session){const {data}=await db.from("editores").select("email").eq("email",S.me.toLowerCase()).maybeSingle();S.canWrite=!!data;
-      if(!S.canWrite)toast("Tu usuario todavía no tiene permiso para editar.")}
+    S.session=session;S.me=session?.user?.email||"";S.canWrite=false;S.isAdmin=false;S.role="";
+    if(session){let {data,error}=await db.from("editores").select("email,rol").eq("email",S.me.toLowerCase()).maybeSingle();
+      if(error){({data}=await db.from("editores").select("email").eq("email",S.me.toLowerCase()).maybeSingle());if(data)data.rol="admin"}
+      S.role=data?.rol||"";S.canWrite=!!S.role;S.isAdmin=S.role==="admin";
+      if(!S.canWrite)toast("Tu usuario todavía no tiene permiso. Pedile al administrador que te dé acceso.")}
     await loadFichero();await loadAll();
   }
   db.auth.onAuthStateChange((_ev,session)=>{setTimeout(()=>onSession(session),0)});
   db.channel("docs").on("postgres_changes",{event:"*",schema:"public",table:"docs"},p=>{
     if(p.eventType==="DELETE")cache.delete(p.old.path);else cache.set(p.new.path,p.new.data);applyCache();
   }).on("postgres_changes",{event:"*",schema:"public",table:"fichadas"},p=>{
-    if(!S.canWrite)return;
+    if(!S.isAdmin)return;
     if(p.eventType==="DELETE")S.fich=S.fich.filter(f=>f.id!==p.old.id);
     else if(p.eventType==="INSERT"&&!S.fich.some(f=>f.id===p.new.id))S.fich=[...S.fich,p.new].sort((a,b)=>a.at.localeCompare(b.at));
     if(!S.editing&&S.view!=="fichar")render();
   }).on("postgres_changes",{event:"*",schema:"public",table:"solicitudes"},p=>{
-    if(!S.canWrite||p.eventType==="DELETE")return;
+    if(!S.isAdmin||p.eventType==="DELETE")return;
     S.sol=[p.new,...S.sol.filter(x=>x.id!==p.new.id)].sort((a,b)=>b.created_at.localeCompare(a.created_at));
     if(!S.editing&&!["fichar","cambios"].includes(S.view))render();
   }).subscribe();
