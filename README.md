@@ -22,3 +22,8 @@ Planificación de turnos del personal para Barrio Norte y Producción. Es una p�
 - `index.html`: toda la app.
 - `config.js`: datos públicos del proyecto de Supabase.
 - `supabase/schema.sql`: tablas y permisos.
+
+## Fichero (entrada y salida)
+1. En Supabase → SQL Editor, pegá y corré `supabase/fichadas.sql` (una sola vez).
+2. En **Personas y puestos**, a cada persona cargale DNI y un PIN de 4 a 6 números.
+3. La pantalla para fichar es el link de la app con `#fichar` al final. Las marcas se ven en la pestaña **Fichadas** y completan las horas reales.
