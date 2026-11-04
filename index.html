@@ -186,16 +186,23 @@ body.ro .tcell{cursor:default}
 .chip.tired{border-color:var(--amber);box-shadow:inset 3px 0 0 var(--amber)}
 .plan td.cell.short{outline:2px dashed var(--amber);outline-offset:-3px}
 .falta{display:block;font-size:.68rem;color:var(--amber);font-weight:600;margin-bottom:2px}
-.notes td{background:var(--bg)}
-.notebtn{width:100%;text-align:left;border:1px dashed var(--line);background:transparent;color:var(--muted);font-size:.72rem;padding:3px 5px;border-radius:6px;white-space:normal;line-height:1.25}
-.notebtn.has{border-style:solid;border-color:var(--amber);background:var(--amber-soft);color:var(--ink)}
+.notes td{background:var(--amber-soft);vertical-align:top}
+.notes td.puesto{color:var(--amber);font-weight:700}
+.notebtn{width:100%;text-align:left;border:1px dashed var(--amber);background:transparent;color:var(--amber);font-size:.72rem;padding:3px 5px;border-radius:6px;white-space:normal;line-height:1.25}
+.notebtn.has{border:1px solid var(--amber);background:var(--surface);color:var(--ink);font-weight:500}
+.notebtn .rs{display:block;font-weight:700;color:var(--amber)}
+.team td.nov{background:var(--amber-soft);padding:0;min-width:180px;white-space:normal;text-align:left}
+.team td.nov .notebtn{border:none;border-radius:0;min-height:42px;background:transparent}
+.plusmark{color:var(--amber);font-weight:700}
 details.avisos{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 16px}
 details.avisos summary{cursor:pointer;font-weight:600}
 .avisos ul{margin:8px 0 0;padding-left:18px;display:grid;gap:3px}
 .avisos li.red{color:var(--warn)}
 .avisos li.amber{color:var(--amber)}
-.tnote{font-size:.75rem;background:var(--amber-soft);border-radius:6px;padding:4px 6px;white-space:pre-line}
-.tnote b{display:block;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em}
+.tnote{font-size:.8rem;background:var(--amber-soft);border-left:4px solid var(--amber);border-radius:6px;padding:6px 8px;white-space:pre-line;display:grid;gap:3px}
+.tnote b{display:block;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--amber)}
+.tnote .resp{font-weight:700}
+.tnote .resp.me{color:var(--warn)}
 .tnote ul{margin:2px 0 0;padding-left:16px}
 .calturn .falta{margin:0}
 .ausentes{font-size:.75rem;color:var(--amber);background:var(--amber-soft);border-radius:6px;padding:4px 6px}
@@ -317,7 +324,13 @@ function puesto(l,p){return loc(l)?.puestos.find(x=>x.id===p)}
 function person(id){return S.staff.find(s=>s.id===id)}
 function pname(id){return person(id)?.name||"(persona borrada)"}
 function cierre(l,d,t){const c=S.config.cierres?.[l]?.[d];return c?(t==="a"?c[0]:c[1]):DEFAULT_CIERRE[d][t==="a"?0:1]}
-function especial(w,d){return S.config.especiales?.[addDays(w,d)]||""}
+function espVal(v){return typeof v==="string"?{n:v,f:/feriado/i.test(v)}:{n:v?.n||"",f:!!v?.f}}
+function especial(w,d){const v=S.config.especiales?.[addDays(w,d)];return v?espVal(v).n:""}
+function esFeriado(date){const v=S.config.especiales?.[date];return !!v&&espVal(v).f}
+/* Domingo al mediodía y feriados se pagan con recargo */
+function plusPay(w,a){return (a.d===6&&a.t==="a")||esFeriado(addDays(w,a.d))}
+function recargo(){return Number(S.config.recargo)||0}
+function occupant(a,w){return weekAssign(w||S.week).find(x=>x.id!==a.id&&x.loc===a.loc&&x.p===a.p&&x.d===a.d&&x.t===a.t)}
 function isAlta(w,d){return d>=4||!!especial(w,d)}
 function dayTag(w,d){const e=especial(w,d);return e?`<span class="tag alta" title="${esc(e)}">${esc(e)}</span>`:`<span class="tag ${d>=4?"alta":""}">${d>=4?"alta":"baja"}</span>`}
 function interval(a){
@@ -332,6 +345,7 @@ function realHours(a){if(!a.realIn||!a.realOut)return null;let s=toMin(a.realIn)
 function rate(a){return Number(S.config.valorHora?.[a.loc+":"+a.p])||0}
 function weekAssign(w){return S.weeks[w]?.assign||[]}
 function weekNotas(w){return S.weeks[w]?.notas||{}}
+function weekResp(w){return S.weeks[w]?.resp||{}}
 function ausente(sid,date){return S.ausencias.find(x=>x.s===sid&&x.from<=date&&date<=x.to)}
 function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>t.hidden=true,2600)}
 function sortedStaff(){return [...S.staff].sort((a,b)=>a.name.localeCompare(b.name,"es"))}
@@ -348,6 +362,9 @@ function avisosFor(w){
     if(a1<b2&&b1<a2){red.add(x.id);red.add(y.id);
       msgs.push({lvl:"red",text:`${pname(x.s)} el ${DAYS[x.d].toLowerCase()} está en ${loc(x.loc)?.name} (${puesto(x.loc,x.p)?.name||"?"}, ${x.in}) y en ${loc(y.loc)?.name} (${puesto(y.loc,y.p)?.name||"?"}, ${y.in}) a la vez.`})}
   }
+  const slot={};for(const a of list)(slot[`${a.loc}|${a.p}|${a.d}|${a.t}`]??=[]).push(a);
+  for(const arr of Object.values(slot))if(arr.length>1){const a=arr[0];arr.forEach(x=>red.add(x.id));
+    msgs.push({lvl:"red",text:`${arr.map(x=>pname(x.s)).join(" y ")} están en el mismo puesto (${puesto(a.loc,a.p)?.name||"?"}, ${loc(a.loc)?.name||""}) el ${DAYS[a.d].toLowerCase()} ${TNAME[a.t].toLowerCase()}. Dejá una sola persona.`})}
   for(const a of list){const au=ausente(a.s,addDays(w,a.d));
     if(au){red.add(a.id);msgs.push({lvl:"red",text:`${pname(a.s)} tiene ${TIPOS[au.tipo].toLowerCase()} el ${DAYS[a.d].toLowerCase()}, pero está asignado en ${loc(a.loc)?.name||""} (${TNAME[a.t].toLowerCase()}).`})}}
   const R=S.config.reglas||{},desc=Number(R.descanso)||0,max=Number(R.maxSemana)||0;
@@ -380,7 +397,7 @@ const cache=new Map();
 function persist(path,body){
   if(!S.db)return Promise.resolve();
   let writes=[[path,body]];
-  if(path==="config/main"){const {valorHora,...rest}=body;writes=[["config/main",rest],["privado/costos",{valorHora:valorHora||{}}]]}
+  if(path==="config/main"){const {valorHora,recargo,...rest}=body;writes=[["config/main",rest],["privado/costos",{valorHora:valorHora||{},recargo:Number(recargo)||0}]]}
   writes.forEach(([p,b])=>cache.set(p,structuredClone(b)));
   queues[path]=(queues[path]||Promise.resolve()).then(async()=>{
     const {error}=await S.db.from("docs").upsert(writes.map(([p,b])=>({path:p,data:b,updated_at:new Date().toISOString()})));
@@ -388,7 +405,7 @@ function persist(path,body){
   }).catch(e=>showBanner("No se pudo guardar el último cambio ("+(e?.message||"sin conexión")+"). Revisá tu conexión e intentá de nuevo."));
   return queues[path];
 }
-function saveWeek(w){const body={assign:weekAssign(w),notas:weekNotas(w),updatedAt:new Date().toISOString()};S.weeks[w]=body;return persist("weeks/"+w,body)}
+function saveWeek(w){const body={assign:weekAssign(w),notas:weekNotas(w),resp:weekResp(w),updatedAt:new Date().toISOString()};S.weeks[w]=body;return persist("weeks/"+w,body)}
 function saveConfig(){return persist("config/main",S.config)}
 function saveStaff(p){S.staff=S.staff.filter(x=>x.id!==p.id).concat(p);const {id,...body}=p;return persist("staff/"+id,body)}
 function removeDoc(coll,id){if(!S.db)return;cache.delete(coll+"/"+id);S.db.from("docs").delete().eq("path",coll+"/"+id).then(({error})=>{if(error)showBanner("No se pudo borrar. Intentá de nuevo.")})}
@@ -432,7 +449,7 @@ function viewSemana(){
   let head1=`<tr><th class="puesto" rowspan="2">Puesto</th>`,head2="<tr>";
   for(let d=0;d<7;d++){
     head1+=`<th class="day" colspan="2">${DSH[d]} ${fmtDM(addDays(S.week,d))} ${dayTag(S.week,d)}</th>`;
-    head2+=`<th class="sub">Alm · ${shortT(cierre(S.loc,d,"a"))}</th><th class="sub">Cena · ${shortT(cierre(S.loc,d,"c"))}</th>`;
+    head2+=`<th class="sub">Alm · ${shortT(cierre(S.loc,d,"a"))}${d===6||esFeriado(addDays(S.week,d))?` <span class="plusmark" title="Se paga con recargo">$+</span>`:""}</th><th class="sub">Cena · ${shortT(cierre(S.loc,d,"c"))}</th>`;
   }
   head1+="</tr>";head2+="</tr>";
   let body="";
@@ -445,7 +462,7 @@ function viewSemana(){
         const miss=av.short.get(`${S.loc}|${p.id}|${d}|${t}`);
         body+=`<td class="cell ${t} ${t==="a"?"first":""} ${miss?"short":""}">${miss?`<span class="falta">Falta ${miss}</span>`:""}${here.map(a=>
           `<button class="chip ${t} ${chipClass(a,av)}" data-edit="${a.id}" title="${esc(pname(a.s))} · ${esc(a.in)} a ${a.out?esc(a.out):"cierre"}"><b>${esc(shortName(pname(a.s)))}</b><span class="mono">${esc(shortT(a.in))}${a.out?"–"+esc(shortT(a.out)):""}</span></button>`).join("")}
-          <button class="add" data-add="${p.id}|${d}|${t}" aria-label="Agregar en ${esc(p.name)}, ${DAYS[d]} ${TNAME[t].toLowerCase()}">+</button></td>`;
+          ${here.length?"":`<button class="add" data-add="${p.id}|${d}|${t}" aria-label="Agregar en ${esc(p.name)}, ${DAYS[d]} ${TNAME[t].toLowerCase()}">+</button>`}</td>`;
       }
       body+="</tr>";
     }
@@ -453,9 +470,8 @@ function viewSemana(){
   let count=`<tr class="count"><td class="puesto">Personas</td>`;
   for(let d=0;d<7;d++)for(const t of ["a","c"])count+=`<td>${new Set(list.filter(a=>a.d===d&&a.t===t).map(a=>a.s)).size}</td>`;
   count+="</tr>";
-  let nrow=`<tr class="notes"><td class="puesto">Notas y tareas<small>del turno</small></td>`;
-  for(let d=0;d<7;d++)for(const t of ["a","c"]){const n=notas[`${S.loc}|${d}|${t}`]||"";
-    nrow+=`<td class="cell ${t==="a"?"first":""}"><button class="notebtn ${n?"has":""}" data-nota="${S.loc}|${d}|${t}">${n?esc(n.length>60?n.slice(0,60)+"…":n):"+ nota"}</button></td>`}
+  let nrow=`<tr class="notes"><td class="puesto">Novedades<small>y responsable</small></td>`;
+  for(let d=0;d<7;d++)for(const t of ["a","c"])nrow+=`<td class="cell ${t==="a"?"first":""}">${noteBtn(`${S.loc}|${d}|${t}`)}</td>`;
   nrow+="</tr>";
   const prevHas=weekAssign(addDays(S.week,-7)).length>0;
   return `<section style="display:grid;gap:12px">
@@ -467,16 +483,21 @@ function viewSemana(){
         <button id="tplSave" ${weekAssign(S.week).length?"":"disabled"}>Guardar como semana tipo</button>
       </div></div>
     ${avisosPanel(av.msgs)}
-    <div class="scroll"><table class="plan"><thead>${head1}${head2}</thead><tbody>${body}${count}${nrow}</tbody></table></div>
+    <div class="scroll"><table class="plan"><thead>${head1}${head2}</thead><tbody>${nrow}${body}${count}</tbody></table></div>
     ${list.length?"":`<p class="hint">Esta semana todavía no tiene turnos en ${esc(L.name)}. Tocá <b>+</b> en un puesto para asignar a alguien, copiá la semana anterior o aplicá una semana tipo.</p>`}
     <p class="hint">Rojo: dos lugares a la vez o persona ausente. Amarillo: poco descanso entre turnos. Borde punteado: el puesto está por debajo de la cobertura mínima (se define en Ajustes). Copiar o aplicar una semana tipo reemplaza la semana en todas las locaciones.</p>
   </section>`;
 }
 
-function noteHTML(n){if(!n)return "";const lines=n.split("\n").map(s=>s.trim()).filter(Boolean);
-  return `<div class="tnote"><b>Notas del turno</b>${lines.length>1?`<ul>${lines.map(l=>`<li>${esc(l.replace(/^[-•*]\s*/,""))}</li>`).join("")}</ul>`:esc(lines[0])}</div>`}
+function noteLines(n){return (n||"").split("\n").map(s=>s.trim()).filter(Boolean).map(l=>l.replace(/^[-•*]\s*/,""))}
+function noteHTML(n,rid,me){const lines=noteLines(n);if(!lines.length&&!rid)return "";
+  return `<div class="tnote">${rid?`<div class="resp ${rid===me?"me":""}">${rid===me?"Sos responsable de este turno":"Responsable: "+esc(pname(rid))}</div>`:""}${lines.length?`<b>Novedades del turno</b>${lines.length>1?`<ul>${lines.map(l=>`<li>${esc(l)}</li>`).join("")}</ul>`:esc(lines[0])}`:""}</div>`}
+/* Botón de novedades: editable para editores, solo texto para el resto */
+function noteBtn(k){const n=weekNotas(S.week)[k]||"",r=weekResp(S.week)[k]||"";
+  const inner=`${r?`<span class="rs">Resp.: ${esc(shortName(pname(r)))}</span>`:""}${n?esc(n.length>70?n.slice(0,70)+"…":n):r?"":"+ novedad"}`;
+  return S.canWrite?`<button class="notebtn ${n||r?"has":""}" data-nota="${k}">${inner}</button>`:(n||r?`<div class="notebtn has">${inner}</div>`:"")}
 function viewCalendario(){
-  const list=weekAssign(S.week),av=avisosFor(S.week),notas=weekNotas(S.week),today=iso(new Date());
+  const list=weekAssign(S.week),av=avisosFor(S.week),notas=weekNotas(S.week),resp=weekResp(S.week),today=iso(new Date());
   const locs=S.config.locations.filter(l=>S.calLoc==="all"||l.id===S.calLoc);
   const filt=`<div class="locs"><button data-calloc="all" aria-pressed="${S.calLoc==="all"}">Todas</button>${S.config.locations.map(l=>`<button data-calloc="${l.id}" aria-pressed="${l.id===S.calLoc}">${esc(l.name)}</button>`).join("")}</div>`;
   const days=DAYS.map((n,d)=>{
@@ -488,14 +509,15 @@ function viewCalendario(){
     const blocks=locs.map(l=>`<div class="calloc"><h4>${esc(l.name)}</h4>${TURNOS.map(t=>{
       const here=list.filter(a=>a.loc===l.id&&a.d===d&&a.t===t.k).sort((a,b)=>(a.in||"").localeCompare(b.in||""));
       const cobMsg=av.msgs.find(m=>m.kind==="cob"&&m.loc===l.id&&m.d===d&&m.t===t.k);
-      return `<div class="calturn"><span>${t.name} · cierre ${shortT(cierre(l.id,d,t.k))}</span>${here.length?here.map(a=>`<button class="chip ${t.k} ${chipClass(a,av)}" data-edit="${a.id}"><b>${esc(pname(a.s))}</b><span class="mono">${esc(shortT(a.in))}–${a.out?esc(shortT(a.out)):"cierre"}</span><small>${esc(puesto(a.loc,a.p)?.name||"")}${a.note?" · "+esc(a.note):""}</small></button>`).join(""):`<span class="none">Sin personal</span>`}
-        ${cobMsg?`<span class="falta">${esc(cobMsg.text.split(": ")[1])}</span>`:""}${noteHTML(notas[`${l.id}|${d}|${t.k}`])}</div>`}).join("")}</div>`).join("");
+      return `<div class="calturn"><span>${t.name} · cierre ${shortT(cierre(l.id,d,t.k))}</span>${noteHTML(notas[`${l.id}|${d}|${t.k}`],resp[`${l.id}|${d}|${t.k}`])}${here.length?here.map(a=>`<button class="chip ${t.k} ${chipClass(a,av)}" data-edit="${a.id}"><b>${esc(pname(a.s))}</b><span class="mono">${esc(shortT(a.in))}–${a.out?esc(shortT(a.out)):"cierre"}</span><small>${esc(puesto(a.loc,a.p)?.name||"")}${a.note?" · "+esc(a.note):""}</small></button>`).join(""):`<span class="none">Sin personal</span>`}
+        ${cobMsg?`<span class="falta">${esc(cobMsg.text.split(": ")[1])}</span>`:""}</div>`}).join("")}</div>`).join("");
     return `<article class="calday ${date===today?"today":""}"><header><strong>${n} ${fmtDM(date)}</strong>${dayTag(S.week,d)}</header>${blocks}
       ${aus.length?`<div class="ausentes">${aus.map(p=>`<b>${esc(TIPOS[ausente(p.id,date).tipo])}:</b> ${esc(p.name)}`).join("<br>")}</div>`:""}
       ${libres.length?`<div class="libres"><b>Libres:</b> ${libres.map(p=>esc(p.name)).join(", ")}</div>`:""}</article>`;
   }).join("");
   return `<section style="display:grid;gap:12px">
-    <div class="bar">${filt}<p class="hint" data-editonly>Tocá un turno para editarlo.</p></div>
+    <div class="bar">${filt}<div class="group"><button class="primary" id="calImg">Descargar imagen para WhatsApp</button><button id="calCopy">Copiar imagen</button><button id="xlsx">Descargar Excel</button></div></div>
+    <p class="hint" data-editonly>Tocá un turno para editarlo. La imagen y el Excel salen con el filtro de locación elegido.</p>
     <div class="calwrap"><div class="cal">${days}</div></div>
     ${list.length?"":`<p class="hint">Esta semana todavía no tiene turnos. Cargalos en <b>Planificar semana</b>.</p>`}
   </section>`;
@@ -522,11 +544,11 @@ function viewEquipo(){
   for(let d=0;d<7;d++)for(const t of ["a","c"]){
     rows+=`<tr>${t==="a"?`<td class="day" rowspan="2">${DAYS[d]}<br><span class="hint">${fmtDM(addDays(S.week,d))}${especial(S.week,d)?" · "+esc(especial(S.week,d)):""}</span></td>`:""}<td>${TNAME[t]}</td>`;
     for(const s of cols){const c=teamCell(s.id,S.loc,d,t,S.week);rows+=`<td class="${t} ${c.kind} pc"><button class="tcell" data-pcell="${s.id}|${d}|${t}" aria-label="${esc(s.name)}, ${DAYS[d]} ${TNAME[t].toLowerCase()}">${esc(c.text)}${c.sub?`<small>${esc(c.sub)}</small>`:""}</button></td>`}
-    rows+=`<td class="mono">${shortT(cierre(S.loc,d,t))} hs</td></tr>`;
+    rows+=`<td class="mono">${shortT(cierre(S.loc,d,t))} hs</td><td class="nov">${noteBtn(`${S.loc}|${d}|${t}`)}</td></tr>`;
   }
   return `<section style="display:grid;gap:12px">
     <div class="bar">${locButtons()}<div class="group"><button class="primary" id="saveImg">Descargar imagen para WhatsApp</button><button id="copyImg">Copiar imagen</button><button id="xlsx">Descargar Excel</button></div></div>
-    ${cols.length?`<div class="scroll"><table class="team"><thead><tr><th>Día</th><th>Turno</th>${cols.map(s=>`<th>${esc(s.name)}</th>`).join("")}<th>Cierre cocina</th></tr></thead><tbody>${rows}</tbody></table></div>`
+    ${cols.length?`<div class="scroll"><table class="team"><thead><tr><th>Día</th><th>Turno</th>${cols.map(s=>`<th>${esc(s.name)}</th>`).join("")}<th>Cierre cocina</th><th>Novedades</th></tr></thead><tbody>${rows}</tbody></table></div>`
       :`<div class="panel empty">Todavía no hay personas en ${esc(L.name)}. Sumalas en <b>Personas y puestos</b>.</div>`}
     <p class="hint" data-editonly>Tocá una celda para cargar o cambiar el turno de esa persona. "Marcar OFF" lo quita.</p>
     <div class="panel preview"><h3>Así se ve la imagen</h3><p class="hint">En el celular podés mantener apretada la imagen para guardarla o compartirla.</p><img id="previewImg" alt="Horario de ${esc(L.name)} de la semana ${fmtDM(S.week)}"></div>
@@ -538,7 +560,7 @@ function miDays(id,w){
   return DAYS.map((n,d)=>{
     const date=addDays(w,d);
     const mine=weekAssign(w).filter(a=>a.s===id&&a.d===d).sort((a,b)=>a.t.localeCompare(b.t)||(a.in||"").localeCompare(b.in||""));
-    return {d,date,n,mine,au:ausente(id,date),notas:weekNotas(w)};
+    return {d,date,n,mine,au:ausente(id,date),notas:weekNotas(w),resp:weekResp(w)};
   });
 }
 function viewMi(){
@@ -555,7 +577,7 @@ function viewMi(){
       ${x.au?`<div class="miaus">${esc(TIPOS[x.au.tipo])}${x.au.nota?" · "+esc(x.au.nota):""}</div>`:""}
       ${x.mine.map(a=>`<div class="miturn ${a.t}"><div class="t">${esc(a.in)} – ${a.out?esc(a.out):"cierre ("+esc(cierre(a.loc,a.d,a.t))+")"}</div>
         <div>${TNAME[a.t]} · ${esc(loc(a.loc)?.name||"")} · ${esc(puesto(a.loc,a.p)?.name||"")}</div>
-        ${a.note?`<div><b>Para vos:</b> ${esc(a.note)}</div>`:""}${noteHTML(x.notas[`${a.loc}|${a.d}|${a.t}`])}</div>`).join("")}
+        ${noteHTML(x.notas[`${a.loc}|${a.d}|${a.t}`],x.resp[`${a.loc}|${a.d}|${a.t}`],id)}${a.note?`<div><b>Para vos:</b> ${esc(a.note)}</div>`:""}</div>`).join("")}
       ${!x.mine.length&&!x.au?`<div class="milibre">Libre</div>`:""}</div></div>`).join("")}</div>`;
   };
   return `<section style="display:grid;gap:12px">
@@ -623,9 +645,9 @@ function hoursData(){
   const [from,to]=hoursRange();const rows={},byLoc={},pt={};const today=iso(new Date());
   for(const [w,doc] of Object.entries(S.weeks))for(const a of doc.assign||[]){
     const date=addDays(w,a.d);if(date<from||date>to)continue;
-    const r=rows[a.s]??={plan:0,real:0,realPlan:0,fichados:0,pend:0,turnos:0,cost:0,byPuesto:{},days:{}};
-    const h=hoursOf(a),rh=realHours(a),use=rh??h,c=use*rate(a);
-    r.plan+=h;r.turnos++;r.cost+=c;
+    const r=rows[a.s]??={plan:0,real:0,realPlan:0,fichados:0,pend:0,turnos:0,cost:0,plus:0,byPuesto:{},days:{}};
+    const h=hoursOf(a),rh=realHours(a),use=rh??h,pl=plusPay(w,a),c=use*rate(a)*(pl?1+recargo()/100:1);
+    r.plan+=h;r.turnos++;r.cost+=c;if(pl)r.plus+=use;
     if(rh!=null){r.real+=rh;r.realPlan+=h;r.fichados++}else if(date<today)r.pend++;
     const key=a.loc+":"+a.p;r.byPuesto[key]=(r.byPuesto[key]||0)+use;
     pt[key]??={h:0,cost:0};pt[key].h+=use;pt[key].cost+=c;
@@ -640,7 +662,7 @@ function viewHoras(){
   const ids=Object.keys(rows).sort((a,b)=>rows[b].plan-rows[a].plan);
   const pkeys=Object.keys(pt).sort((a,b)=>pt[b].h-pt[a].h);
   const totCost=Object.values(byLoc).reduce((s,x)=>s+x.cost,0),totH=Object.values(byLoc).reduce((s,x)=>s+x.h,0);
-  const pend=Object.values(rows).reduce((s,r)=>s+r.pend,0);
+  const pend=Object.values(rows).reduce((s,r)=>s+r.pend,0),totPlus=Object.values(rows).reduce((s,r)=>s+r.plus,0);
   const noRate=pkeys.filter(k=>!(Number(S.config.valorHora?.[k])>0));
   const presets=[["semana","Semana elegida"],["semana-ant","Semana anterior"],["mes","Este mes"],["mes-ant","Mes pasado"],["custom","Otro rango"]];
   const wk=weekAssign(S.week).slice().sort((a,b)=>a.d-b.d||a.t.localeCompare(b.t)||a.loc.localeCompare(b.loc)||(a.in||"").localeCompare(b.in||""));
@@ -651,17 +673,18 @@ function viewHoras(){
     </div><div class="group"><button class="primary" id="xlsx">Descargar Excel</button><button id="csv" ${ids.length?"":"disabled"}>Descargar CSV</button></div></div>
     ${ids.length?`<div class="panel"><div class="kpis"><div><b>${fmtH(totH)} h</b><span>Horas del período</span></div><div><b>${money(totCost)}</b><span>Costo de personal</span></div>
       ${S.config.locations.map(l=>byLoc[l.id]?`<div><b>${money(byLoc[l.id].cost)}</b><span>${esc(l.name)} · ${fmtH(byLoc[l.id].h)} h</span></div>`:"").join("")}
+      <div><b>${fmtH(totPlus)} h</b><span>Domingo al mediodía y feriados${recargo()?` (+${recargo()}%)`:""}</span></div>
       <div><b>${pend}</b><span>Turnos pasados sin horas reales</span></div></div>
       ${noRate.length?`<p class="hint">Hay puestos sin valor hora, así que su costo da $ 0. Cargalo en Ajustes.</p>`:""}</div>
-    <div class="scroll"><table><thead><tr><th>Persona</th><th class="num">Planificadas</th><th class="num">Reales</th><th class="num">Diferencia</th><th class="num">Turnos</th><th class="num">Dobles</th><th class="num">Costo</th><th>Por puesto</th></tr></thead><tbody>
-      ${ids.map(id=>{const r=rows[id];const dif=r.fichados?r.real-r.realPlan:null;return `<tr><td><b>${esc(pname(id))}</b></td><td class="num mono">${fmtH(r.plan)}</td><td class="num mono">${r.fichados?fmtH(r.real):"–"}${r.fichados&&r.fichados<r.turnos?`<br><small class="hint">${r.fichados} de ${r.turnos}</small>`:""}</td><td class="num mono ${dif>0?"diff-pos":dif<0?"diff-neg":""}">${dif==null?"–":(dif>0?"+":"")+fmtH(dif)}</td><td class="num">${r.turnos}</td><td class="num">${r.dobles}</td><td class="num mono">${money(r.cost)}</td><td><div class="pills">${Object.entries(r.byPuesto).sort((a,b)=>b[1]-a[1]).map(([k,h])=>{const [l,p]=k.split(":");return `<span class="pill">${esc(puesto(l,p)?.name||p)} · ${esc(loc(l)?.name||l)} · ${fmtH(h)} h</span>`}).join("")}</div></td></tr>`}).join("")}
+    <div class="scroll"><table><thead><tr><th>Persona</th><th class="num">Planificadas</th><th class="num">Reales</th><th class="num">Diferencia</th><th class="num">Dom. mediodía y feriado</th><th class="num">Turnos</th><th class="num">Dobles</th><th class="num">Costo</th><th>Por puesto</th></tr></thead><tbody>
+      ${ids.map(id=>{const r=rows[id];const dif=r.fichados?r.real-r.realPlan:null;return `<tr><td><b>${esc(pname(id))}</b></td><td class="num mono">${fmtH(r.plan)}</td><td class="num mono">${r.fichados?fmtH(r.real):"–"}${r.fichados&&r.fichados<r.turnos?`<br><small class="hint">${r.fichados} de ${r.turnos}</small>`:""}</td><td class="num mono ${dif>0?"diff-pos":dif<0?"diff-neg":""}">${dif==null?"–":(dif>0?"+":"")+fmtH(dif)}</td><td class="num mono">${r.plus?fmtH(r.plus):"–"}</td><td class="num">${r.turnos}</td><td class="num">${r.dobles}</td><td class="num mono">${money(r.cost)}</td><td><div class="pills">${Object.entries(r.byPuesto).sort((a,b)=>b[1]-a[1]).map(([k,h])=>{const [l,p]=k.split(":");return `<span class="pill">${esc(puesto(l,p)?.name||p)} · ${esc(loc(l)?.name||l)} · ${fmtH(h)} h</span>`}).join("")}</div></td></tr>`}).join("")}
     </tbody></table></div>
     <div class="panel"><h3>Por puesto</h3><div class="scroll"><table><thead><tr><th>Puesto</th><th>Locación</th><th class="num">Horas</th><th class="num">Costo</th></tr></thead><tbody>${pkeys.map(k=>{const [l,p]=k.split(":");return `<tr><td>${esc(puesto(l,p)?.name||p)}</td><td>${esc(loc(l)?.name||l)}</td><td class="num mono">${fmtH(pt[k].h)}</td><td class="num mono">${money(pt[k].cost)}</td></tr>`}).join("")}</tbody></table></div></div>`
     :`<div class="panel empty">No hay turnos cargados entre el ${fmtDM(from)} y el ${fmtDM(to)}.</div>`}
     <div class="panel"><h2>Horas reales de la semana ${fmtDM(S.week)} – ${fmtDM(addDays(S.week,6))}</h2>
-      <p class="hint">Cargá a qué hora entró y salió cada uno. Si un turno tiene horas reales, el informe y el costo usan esas; si no, usan las planificadas.</p>
+      <p class="hint">Cargá a qué hora entró y salió cada uno. Si un turno tiene horas reales, el informe y el costo usan esas; si no, usan las planificadas. <span class="plusmark">$+</span> marca los turnos que se pagan con recargo.</p>
       ${wk.length?`<div class="scroll"><table><thead><tr><th>Día</th><th>Persona</th><th>Lugar</th><th>Planificado</th><th>Entró</th><th>Salió</th></tr></thead><tbody>
-      ${wk.map(a=>`<tr><td>${DSH[a.d]} ${fmtDM(addDays(S.week,a.d))} · ${TNAME[a.t]}</td><td><b>${esc(pname(a.s))}</b></td><td>${esc(loc(a.loc)?.name||"")} · ${esc(puesto(a.loc,a.p)?.name||"")}</td><td class="mono">${esc(a.in)}–${esc(a.out||cierre(a.loc,a.d,a.t))}</td>
+      ${wk.map(a=>`<tr><td>${DSH[a.d]} ${fmtDM(addDays(S.week,a.d))} · ${TNAME[a.t]}${plusPay(S.week,a)?` <span class="plusmark">$+</span>`:""}</td><td><b>${esc(pname(a.s))}</b></td><td>${esc(loc(a.loc)?.name||"")} · ${esc(puesto(a.loc,a.p)?.name||"")}</td><td class="mono">${esc(a.in)}–${esc(a.out||cierre(a.loc,a.d,a.t))}</td>
         <td><input type="time" id="ri-${a.id}" data-real="${a.id}|realIn" value="${esc(a.realIn||"")}" aria-label="Entrada real"></td><td><input type="time" id="ro-${a.id}" data-real="${a.id}|realOut" value="${esc(a.realOut||"")}" aria-label="Salida real"></td></tr>`).join("")}
       </tbody></table></div>`:`<p class="hint">Esta semana no tiene turnos.</p>`}
     </div>
@@ -699,9 +722,10 @@ function viewAjustes(){
         <div class="row"><label>Almuerzo<input type="time" id="entA" value="${S.config.entradas?.a||"11:30"}" data-entrada="a"></label><label>Cena<input type="time" id="entC" value="${S.config.entradas?.c||"19:30"}" data-entrada="c"></label></div>
       </div>
       <div class="panel"><h2>Feriados y eventos</h2>
-        <p class="hint">Esos días cuentan como de alta, para la cobertura mínima, aunque caigan de lunes a jueves.</p>
-        <div class="row"><input type="date" id="espF" aria-label="Fecha"><input type="text" id="espN" placeholder="Ej.: Feriado, Evento" aria-label="Nombre" style="flex:1 1 140px"><button id="espAdd">Agregar</button></div>
-        ${esp.length?`<div class="list">${esp.map(([f,n])=>`<div class="item ${f<iso(new Date())?"past":""}"><span><span class="mono">${fmtDM(f)}/${f.slice(2,4)}</span> · ${esc(n)}</span><button class="ghost danger" data-espdel="${f}">Quitar</button></div>`).join("")}</div>`:""}
+        <p class="hint">Esos días cuentan como de alta, para la cobertura mínima, aunque caigan de lunes a jueves. Los feriados, igual que el domingo al mediodía, se pagan con recargo.</p>
+        <div class="row"><label>Recargo de domingo al mediodía y feriados (%)<input type="number" min="0" max="300" id="recargo" value="${recargo()||""}" placeholder="0"></label></div>
+        <div class="row"><input type="date" id="espF" aria-label="Fecha"><select id="espT" aria-label="Tipo"><option value="feriado">Feriado (se paga más)</option><option value="evento">Evento</option></select><input type="text" id="espN" placeholder="Ej.: Día de la Independencia" aria-label="Nombre" style="flex:1 1 140px"><button id="espAdd">Agregar</button></div>
+        ${esp.length?`<div class="list">${esp.map(([f,v])=>{const x=espVal(v);return `<div class="item ${f<iso(new Date())?"past":""}"><span><span class="mono">${fmtDM(f)}/${f.slice(2,4)}</span> · ${esc(x.n)} <span class="pill ${x.f?"vac":""}">${x.f?"Feriado":"Evento"}</span></span><button class="ghost danger" data-espdel="${f}">Quitar</button></div>`}).join("")}</div>`:""}
       </div>
       <div class="panel"><h2>Semanas tipo</h2>
         <p class="hint">Se guardan desde Planificar semana con "Guardar como semana tipo".</p>
@@ -734,11 +758,11 @@ function modalShift(e){
   const clash=others.filter(x=>{const [p1,p2]=interval(a),[q1,q2]=interval(x);return p1<q2&&q1<p2});
   const busy=new Set(weekAssign(S.week).filter(x=>x.id!==a.id&&x.d===a.d&&x.t===a.t).map(x=>x.s));
   const opt=s=>{const au=ausente(s.id,date);return `<option value="${s.id}" ${s.id===a.s?"selected":""} ${au&&s.id!==a.s?"disabled":""}>${esc(s.name)}${au?" · "+TIPOS[au.tipo].toLowerCase():busy.has(s.id)?" · ya tiene turno":""}</option>`};
-  const au=a.s&&ausente(a.s,date);
+  const au=a.s&&ausente(a.s,date);const occ=occupant(a);
   return `<div class="overlay" data-close="1"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="mt">
     ${e.byPerson?`<h2 id="mt">${esc(pname(a.s))} · ${DAYS[a.d]} ${TNAME[a.t].toLowerCase()}</h2>
     <div class="row"><label>Locación<select id="mLoc">${S.config.locations.map(l=>`<option value="${l.id}" ${l.id===a.loc?"selected":""}>${esc(l.name)}</option>`).join("")}</select></label>
-      <label>Puesto<select id="mPuesto">${(()=>{const mine=person(a.s)?.puestos||[];const ps=[...(L?.puestos||[])].sort((x,y)=>mine.includes(a.loc+":"+y.id)-mine.includes(a.loc+":"+x.id));return ps.map(x=>`<option value="${x.id}" ${x.id===a.p?"selected":""}>${esc(x.name)}${mine.includes(a.loc+":"+x.id)?"":" (no es su puesto)"}</option>`).join("")})()}</select></label></div>`
+      <label>Puesto<select id="mPuesto">${(()=>{const mine=person(a.s)?.puestos||[];const ps=[...(L?.puestos||[])].sort((x,y)=>mine.includes(a.loc+":"+y.id)-mine.includes(a.loc+":"+x.id));return ps.map(x=>{const o=occupant({...a,p:x.id});return `<option value="${x.id}" ${x.id===a.p?"selected":""} ${o&&x.id!==a.p?"disabled":""}>${esc(x.name)}${o?" (ocupado: "+esc(shortName(pname(o.s)))+")":mine.includes(a.loc+":"+x.id)?"":" (no es su puesto)"}</option>`}).join("")})()}</select></label></div>`
     :`<h2 id="mt">${esc(P?.name||"")} · ${esc(L?.name||"")}</h2>`}
     <p class="hint">${DAYS[a.d]} ${fmtDM(date)} · ${TNAME[a.t]} · cierre ${cierre(a.loc,a.d,a.t)}</p>
     <label>Persona<select id="mPerson"><option value="">Elegí a alguien</option>
@@ -749,10 +773,11 @@ function modalShift(e){
       ${a.out?`<label>Hora de salida<input type="time" id="mOut" value="${a.out}"></label>`:""}</div>
     <label>Nota para esta persona<input type="text" id="mNote" value="${esc(a.note||"")}" placeholder="Ej.: cambio de aceite"></label>
     <div class="row"><label>Entró (real)<input type="time" id="mRin" value="${esc(a.realIn||"")}"></label><label>Salió (real)<input type="time" id="mRout" value="${esc(a.realOut||"")}"></label></div>
+    ${occ?`<div class="warnbox">${esc(pname(occ.s))} ya está en ${esc(P?.name||"este puesto")} ese turno. Cada puesto lleva una sola persona: ${e.byPerson?"elegí otro puesto o quitá":"quitá"} primero a ${esc(shortName(pname(occ.s)))}.</div>`:""}
     ${au?`<div class="warnbox">${esc(pname(a.s))} tiene ${TIPOS[au.tipo].toLowerCase()} ese día.</div>`:""}
     ${clash.length?`<div class="warnbox">${esc(pname(a.s))} ya trabaja en ${clash.map(x=>`${esc(loc(x.loc).name)} (${esc(puesto(x.loc,x.p)?.name||"")}, ${x.in})`).join(" y ")} en ese horario.</div>`:""}
     ${a.s&&!(person(a.s)?.puestos||[]).includes(key)?`<p class="hint">${esc(pname(a.s))} no tiene este puesto en su ficha. Podés asignarlo igual.</p>`:""}
-    <div class="actions">${e.isNew?"":`<button class="danger" id="mDel">${e.byPerson?"Marcar OFF":"Quitar turno"}</button>`}<button id="mCancel">Cancelar</button><button class="primary" id="mSave" ${a.s?"":"disabled"}>Guardar</button></div>
+    <div class="actions">${e.isNew?"":`<button class="danger" id="mDel">${e.byPerson?"Marcar OFF":"Quitar turno"}</button>`}<button id="mCancel">Cancelar</button><button class="primary" id="mSave" ${a.s&&!occ?"":"disabled"}>Guardar</button></div>
   </div></div>`;
 }
 function modalPerson(e){
@@ -769,11 +794,16 @@ function modalPerson(e){
 }
 function modalNota(e){
   const [l,d,t]=e.key.split("|");
+  const work=new Set(weekAssign(S.week).filter(a=>a.loc===l&&a.d===+d&&a.t===t).map(a=>a.s));
+  const ppl=sortedStaff().filter(p=>p.active!==false||p.id===e.resp);
+  const o=p=>`<option value="${p.id}" ${p.id===e.resp?"selected":""}>${esc(p.name)}</option>`;
+  const inT=ppl.filter(p=>work.has(p.id)),outT=ppl.filter(p=>!work.has(p.id));
   return `<div class="overlay" data-close="1"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="mt">
-    <h2 id="mt">Notas y tareas del turno</h2>
-    <p class="hint">${esc(loc(l)?.name||"")} · ${DAYS[+d]} ${fmtDM(addDays(S.week,+d))} · ${TNAME[t]}. Lo ve todo el equipo de ese turno en Mi horario y en el calendario.</p>
-    <label>Una tarea o decisión por línea<textarea id="nTxt" placeholder="Ej.:&#10;Llega el proveedor de verduras a las 12&#10;Hacer inventario de cámara&#10;Probar el plato nuevo">${esc(e.text)}</textarea></label>
-    <div class="actions">${e.text?`<button class="danger" id="nDel">Borrar nota</button>`:""}<button id="mCancel">Cancelar</button><button class="primary" id="nSave">Guardar</button></div>
+    <h2 id="mt">Novedades del turno</h2>
+    <p class="hint">${esc(loc(l)?.name||"")} · ${DAYS[+d]} ${fmtDM(addDays(S.week,+d))} · ${TNAME[t]}. Lo ve todo el equipo en Mi horario, en el calendario y en las imágenes.</p>
+    <label>Responsable del turno<select id="nResp"><option value="">Sin responsable</option>${inT.length?`<optgroup label="Trabajan en este turno">${inT.map(o).join("")}</optgroup>`:""}${outT.length?`<optgroup label="Otras personas">${outT.map(o).join("")}</optgroup>`:""}</select></label>
+    <label>Novedades, decisiones o tareas (una por línea)<textarea id="nTxt" placeholder="Ej.:&#10;Llega el proveedor de verduras a las 12&#10;Hacer inventario de cámara&#10;Probar el plato nuevo">${esc(e.text)}</textarea></label>
+    <div class="actions">${e.text||e.resp?`<button class="danger" id="nDel">Borrar todo</button>`:""}<button id="mCancel">Cancelar</button><button class="primary" id="nSave">Guardar</button></div>
   </div></div>`;
 }
 function modalLogin(e){
@@ -801,11 +831,13 @@ function modalTpl(){
     <div class="actions"><button id="mCancel">Cancelar</button><button class="primary" id="tSave">Guardar</button></div>
   </div></div>`;
 }
-function defaultPuesto(sid,l){const mine=person(sid)?.puestos||[];const L=loc(l);return (L?.puestos.find(x=>mine.includes(l+":"+x.id))||L?.puestos[0])?.id||""}
+function defaultPuesto(sid,l,d,t,id){const mine=person(sid)?.puestos||[];const L=loc(l);if(!L)return "";
+  const own=x=>mine.includes(l+":"+x.id),free=x=>d==null||!occupant({id,loc:l,p:x.id,d,t});
+  return (L.puestos.find(x=>own(x)&&free(x))||L.puestos.find(free)||L.puestos.find(own)||L.puestos[0])?.id||""}
 function readShiftForm(){
   const a=S.editing.a;
   const ml=document.getElementById("mLoc"),mp=document.getElementById("mPuesto");
-  if(ml&&ml.value!==a.loc){a.loc=ml.value;a.p=defaultPuesto(a.s,a.loc)}else if(mp)a.p=mp.value;
+  if(ml&&ml.value!==a.loc){a.loc=ml.value;a.p=defaultPuesto(a.s,a.loc,a.d,a.t,a.id)}else if(mp)a.p=mp.value;
   a.s=document.getElementById("mPerson").value;
   a.in=document.getElementById("mIn").value||a.in;
   const mode=document.getElementById("mOutMode").value;
@@ -828,9 +860,10 @@ const FONT=(w,s)=>`${w} ${s}px 'IBM Plex Sans', system-ui, sans-serif`;
 function buildCanvas(){
   const l=S.loc,w=S.week,L=loc(l),cols=teamCols(l,w);
   const sc=2,dayW=120,turW=96,colW=150,ciW=124,rowH=46,headH=40,titleH=64;
-  const W=dayW+turW+cols.length*colW+ciW,H=titleH+headH+14*rowH;
-  const cv=document.createElement("canvas");cv.width=W*sc;cv.height=H*sc;
-  const g=cv.getContext("2d");g.scale(sc,sc);
+  const W=Math.max(dayW+turW+cols.length*colW+ciW,560),gridH=titleH+headH+14*rowH;
+  const cv=document.createElement("canvas");const g=cv.getContext("2d");
+  const nov=novBlocks(g,l,w,W-32);const H=gridH+(nov.h?nov.h+24:0);
+  cv.width=W*sc;cv.height=H*sc;g.scale(sc,sc);
   const C={bg:"#FFFFFF",head:"#16302D",headInk:"#FFFFFF",lunch:"#F7C4AE",dinner:"#FBDDBF",off:"#BDEBF2",offInk:"#1E5F6B",else:"#E2D6F3",elseInk:"#4B3A72",aus:"#FFE3A3",ausInk:"#7A4E00",ink:"#16302D",dayA:"#E9EEEC",alta:"#C7651B"};
   g.fillStyle=C.bg;g.fillRect(0,0,W,H);
   g.fillStyle=C.ink;g.textBaseline="middle";
@@ -860,9 +893,22 @@ function buildCanvas(){
   }
   g.strokeStyle="#FFFFFF";g.lineWidth=2;
   for(let r=0;r<=14;r++){const y=titleH+headH+r*rowH;g.beginPath();g.moveTo(r%2?dayW:0,y);g.lineTo(W,y);g.stroke()}
-  x=0;for(const wd of widths){x+=wd;g.beginPath();g.moveTo(x,titleH);g.lineTo(x,H);g.stroke()}
+  x=0;for(const wd of widths){x+=wd;g.beginPath();g.moveTo(x,titleH);g.lineTo(x,gridH);g.stroke()}
+  if(nov.h)drawNov(g,nov,16,gridH+16,W-32);
   return cv;
 }
+/* Novedades y responsables de una locación, para dibujar en las imágenes */
+function novItems(l,w){const n=weekNotas(w),r=weekResp(w),out=[];
+  for(let d=0;d<7;d++)for(const t of ["a","c"]){const k=`${l}|${d}|${t}`,lines=noteLines(n[k]);if(!lines.length&&!r[k])continue;
+    out.push({title:`${DAYS[d]} ${fmtDM(addDays(w,d))} · ${TNAME[t]}`,resp:r[k]?pname(r[k]):"",lines})}
+  return out}
+function novBlocks(g,l,w,max){const items=novItems(l,w);if(!items.length)return {h:0,rows:[]};
+  const rows=[[FONT(800,16),"NOVEDADES DE LA SEMANA","#8A5A00"]];
+  for(const it of items){rows.push([FONT(700,14),it.title+(it.resp?" · Responsable: "+it.resp:""),"#16302D"]);
+    for(const s of it.lines){g.font=FONT(400,13);wrap(g,"• "+s,max-16).forEach(x=>rows.push([FONT(400,13),x,"#16302D"]))}}
+  return {h:rows.length*20+16,rows}}
+function drawNov(g,nov,x,y,w){g.fillStyle="#FFF0CF";g.fillRect(x-8,y-6,w+16,nov.h);g.fillStyle="#8A5A00";g.fillRect(x-8,y-6,5,nov.h);
+  g.textAlign="left";g.textBaseline="top";nov.rows.forEach(([f,t,c],i)=>{g.font=f;g.fillStyle=c;g.fillText(t,x+4,y+4+i*20)})}
 function wrap(g,text,max){const out=[];for(const para of String(text).split("\n")){let line="";for(const word of para.split(/\s+/)){const t=line?line+" "+word:word;if(g.measureText(t).width>max&&line){out.push(line);line=word}else line=t}if(line)out.push(line)}return out}
 /* Imagen de Mi horario: una fila por día, con turnos y notas del turno */
 function buildPersonCanvas(id){
@@ -873,9 +919,11 @@ function buildPersonCanvas(id){
     if(x.au)items.push({kind:"aus",lines:[[FONT(700,14),TIPOS[x.au.tipo]+(x.au.nota?" · "+x.au.nota:"")]]});
     for(const a of x.mine){
       const lines=[[FONT(700,15),`${TNAME[a.t]}: ${a.in} a ${a.out||"cierre ("+cierre(a.loc,a.d,a.t)+")"}`],[FONT(400,13),`${loc(a.loc)?.name||""} · ${puesto(a.loc,a.p)?.name||""}`]];
+      const k=`${a.loc}|${a.d}|${a.t}`,rid=x.resp[k];
+      if(rid)lines.push([FONT(700,13),rid===id?"★ Sos responsable de este turno":"Responsable: "+pname(rid)]);
+      const nl=noteLines(x.notas[k]);if(nl.length)lines.push([FONT(700,12),"NOVEDADES DEL TURNO"]);
+      for(const l of nl)lines.push([FONT(400,13),"• "+l]);
       if(a.note)lines.push([FONT(600,13),"Para vos: "+a.note]);
-      const n=x.notas[`${a.loc}|${a.d}|${a.t}`];
-      if(n)for(const l of n.split("\n").map(s=>s.trim()).filter(Boolean))lines.push([FONT(400,13),"• "+l.replace(/^[-•*]\s*/,"")]);
       items.push({kind:a.t,lines});
     }
     if(!items.length)items.push({kind:"off",lines:[[FONT(700,14),"Libre"]]});
@@ -900,6 +948,44 @@ function buildPersonCanvas(id){
   });
   return cv;
 }
+/* Imagen del calendario: un bloque por día, almuerzo y cena lado a lado, con novedades */
+function buildCalCanvas(){
+  const w=S.week,sc=2,W=820,pad=16,colW=(W-pad*2-12)/2,LH=18;
+  const locs=S.config.locations.filter(l=>S.calLoc==="all"||l.id===S.calLoc);
+  const cv=document.createElement("canvas"),g=cv.getContext("2d");
+  const list=weekAssign(w),n=weekNotas(w),r=weekResp(w);
+  const days=[];
+  for(let d=0;d<7;d++){const secs=[];
+    for(const L of locs){const cols=["a","c"].map(t=>{const rows=[];const k=`${L.id}|${d}|${t}`;
+        if(r[k])rows.push([FONT(700,13),"Responsable: "+pname(r[k]),"#8A5A00"]);
+        for(const s of noteLines(n[k])){g.font=FONT(500,12);wrap(g,"• "+s,colW-20).forEach(x=>rows.push([FONT(500,12),x,"#8A5A00"]))}
+        const here=list.filter(a=>a.loc===L.id&&a.d===d&&a.t===t).sort((a,b)=>(a.in||"").localeCompare(b.in||""));
+        for(const a of here)rows.push([FONT(600,13),fitW(g,FONT(600,13),`${pname(a.s)} · ${puesto(a.loc,a.p)?.name||""} · ${shortT(a.in)}–${a.out?shortT(a.out):"cierre"}`,colW-20),"#16302D"]);
+        if(!here.length)rows.push([FONT(400,13),"Sin personal","#5D706C"]);
+        return {t,rows}});
+      const bh=22+Math.max(...cols.map(c=>c.rows.length))*LH+6,h=(locs.length>1?20:4)+bh+8;secs.push({L,cols,h,bh})}
+    days.push({d,secs,h:30+secs.reduce((s,x)=>s+x.h,0)+8})}
+  const titleH=70,H=titleH+days.reduce((s,x)=>s+x.h,0)+8;
+  cv.width=W*sc;cv.height=H*sc;g.scale(sc,sc);
+  g.fillStyle="#FFFFFF";g.fillRect(0,0,W,H);g.textBaseline="top";g.textAlign="left";
+  g.fillStyle="#16302D";g.font="800 24px 'Bricolage Grotesque', system-ui, sans-serif";g.fillText(locs.length===1?locs[0].name.toUpperCase():"OSVALDO · CALENDARIO",pad,16);
+  g.font=FONT(500,14);g.fillStyle="#5D706C";g.fillText(`Semana del ${fmtDM(w)} al ${fmtDM(addDays(w,6))}`,pad,48);
+  let y=titleH;
+  for(const D of days){
+    g.fillStyle="#16302D";g.fillRect(0,y,W,26);g.fillStyle="#FFFFFF";g.font=FONT(700,14);
+    const e=especial(w,D.d);g.fillText(`${DAYS[D.d].toUpperCase()} ${fmtDM(addDays(w,D.d))}${e?" · "+e:isAlta(w,D.d)?" · alta":""}`,pad,y+6);
+    let yy=y+30;
+    for(const s of D.secs){
+      if(locs.length>1){g.fillStyle="#5D706C";g.font=FONT(700,12);g.fillText(s.L.name.toUpperCase(),pad,yy+4)}
+      s.cols.forEach((c,i)=>{const x=pad+i*(colW+12),top=yy+(locs.length>1?20:4);
+        g.fillStyle=c.t==="a"?"#F7C4AE":"#FBDDBF";g.fillRect(x,top,colW,s.bh);
+        g.fillStyle="#16302D";g.font=FONT(700,12);g.fillText(`${TNAME[c.t].toUpperCase()} · CIERRE ${shortT(cierre(s.L.id,D.d,c.t))}${c.t==="a"&&plusPay(w,{d:D.d,t:"a"})?" · $+":""}`,x+8,top+4);
+        c.rows.forEach(([f,t,col],k)=>{g.font=f;g.fillStyle=col;g.fillText(t,x+8,top+22+k*LH)})});
+      yy+=s.h}
+    y+=D.h}
+  return cv;
+}
+function fitW(g,f,t,max){g.font=f;return fit(g,t,max)}
 function fit(g,t,max){if(g.measureText(t).width<=max)return t;while(t.length>1&&g.measureText(t+"…").width>max)t=t.slice(0,-1);return t+"…"}
 function drawPreview(){const img=document.getElementById("previewImg");if(!img||!teamCols(S.loc,S.week).length){img&&(img.closest(".panel").hidden=true);return}
   document.fonts?.ready.then(()=>{const im=document.getElementById("previewImg");if(im)im.src=buildCanvas().toDataURL("image/png")})}
@@ -909,8 +995,8 @@ async function savePNG(cv,filename){
   saveFile(filename,blob);toast("Imagen descargada")
 }
 function slug(s){return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g,"-")}
-async function copyImage(){
-  try{const blob=await new Promise(r=>buildCanvas().toBlob(r,"image/png"));await navigator.clipboard.write([new ClipboardItem({"image/png":blob})]);toast("Imagen copiada: pegala en WhatsApp")}
+async function copyImage(build=buildCanvas){
+  try{const blob=await new Promise(r=>build().toBlob(r,"image/png"));await navigator.clipboard.write([new ClipboardItem({"image/png":blob})]);toast("Imagen copiada: pegala en WhatsApp")}
   catch{toast("Este navegador no deja copiar imágenes. Usá Descargar.")}
 }
 async function copyText(text,okMsg){
@@ -921,25 +1007,34 @@ async function copyText(text,okMsg){
 function sheetName(s){return s.replace(/[\\/?*\[\]:]/g," ").slice(0,31)}
 function addSheet(wb,name,rows,widths){const ws=XLSX.utils.aoa_to_sheet(rows);ws["!cols"]=widths.map(w=>({wch:w}));XLSX.utils.book_append_sheet(wb,ws,sheetName(name))}
 function buildWorkbook(){
-  const w=S.week,wb=XLSX.utils.book_new(),notas=weekNotas(w);
+  const w=S.week,wb=XLSX.utils.book_new(),notas=weekNotas(w),resp=weekResp(w);
+  const nv=k=>(notas[k]||"").replace(/\n/g," · "),rn=k=>resp[k]?pname(resp[k]):"";
+  if(S.view==="calendario"){
+    const cal=[[`Calendario · semana del ${fmtDM(w)} al ${fmtDM(addDays(w,6))}`],[],["Día","Fecha","Locación","Turno","Cierre","Responsable","Novedades del turno","Personal"]];
+    for(let d=0;d<7;d++)for(const L of S.config.locations.filter(l=>S.calLoc==="all"||l.id===S.calLoc))for(const t of ["a","c"]){const k=`${L.id}|${d}|${t}`;
+      const here=weekAssign(w).filter(a=>a.loc===L.id&&a.d===d&&a.t===t).sort((a,b)=>(a.in||"").localeCompare(b.in||""));
+      cal.push([DAYS[d],fmtDM(addDays(w,d))+(especial(w,d)?" · "+especial(w,d):""),L.name,TNAME[t],cierre(L.id,d,t),rn(k),nv(k),here.map(a=>`${pname(a.s)} (${puesto(a.loc,a.p)?.name||""}, ${a.in}–${a.out||"cierre"})`).join("; ")])}
+    addSheet(wb,"Calendario",cal,[11,13,14,10,8,18,40,80]);
+  }
   for(const L of S.config.locations){
     const cols=teamCols(L.id,w);
-    const rows=[[`${L.name} · semana del ${fmtDM(w)} al ${fmtDM(addDays(w,6))}`],[],["Día","Fecha","Turno",...cols.map(s=>s.name),"Cierre cocina","Notas del turno"]];
+    const rows=[[`${L.name} · semana del ${fmtDM(w)} al ${fmtDM(addDays(w,6))}`],[],["Día","Fecha","Turno",...cols.map(s=>s.name),"Cierre cocina","Responsable","Novedades del turno"]];
     for(let d=0;d<7;d++)for(const t of ["a","c"]){
-      rows.push([DAYS[d],fmtDM(addDays(w,d))+(especial(w,d)?" · "+especial(w,d):""),TNAME[t],...cols.map(s=>{const c=teamCell(s.id,L.id,d,t,w);return c.sub?c.text+" ("+c.sub+")":c.text}),cierre(L.id,d,t),(notas[`${L.id}|${d}|${t}`]||"").replace(/\n/g," · ")]);
+      rows.push([DAYS[d],fmtDM(addDays(w,d))+(especial(w,d)?" · "+especial(w,d):""),TNAME[t],...cols.map(s=>{const c=teamCell(s.id,L.id,d,t,w);return c.sub?c.text+" ("+c.sub+")":c.text}),cierre(L.id,d,t),rn(`${L.id}|${d}|${t}`),nv(`${L.id}|${d}|${t}`)]);
     }
-    addSheet(wb,"Horario "+L.name,rows,[11,13,10,...cols.map(()=>24),13,40]);
+    addSheet(wb,"Horario "+L.name,rows,[11,13,10,...cols.map(()=>24),13,18,40]);
   }
-  const det=[["Fecha","Día","Turno","Locación","Puesto","Persona","Entrada","Salida","Horas plan.","Entrada real","Salida real","Horas reales","Nota para la persona","Notas del turno"]];
+  const det=[["Fecha","Día","Turno","Locación","Puesto","Persona","Entrada","Salida","Horas plan.","Entrada real","Salida real","Horas reales","Dom. mediodía o feriado","Nota para la persona","Responsable del turno","Novedades del turno"]];
   weekAssign(w).slice().sort((a,b)=>a.d-b.d||a.t.localeCompare(b.t)||a.loc.localeCompare(b.loc)||(a.in||"").localeCompare(b.in||"")).forEach(a=>{const rh=realHours(a);
-    det.push([addDays(w,a.d),DAYS[a.d],TNAME[a.t],loc(a.loc)?.name||a.loc,puesto(a.loc,a.p)?.name||a.p,pname(a.s),a.in,a.out||cierre(a.loc,a.d,a.t),+hoursOf(a).toFixed(2),a.realIn||"",a.realOut||"",rh==null?"":+rh.toFixed(2),a.note||"",(notas[`${a.loc}|${a.d}|${a.t}`]||"").replace(/\n/g," · ")])});
-  addSheet(wb,"Turnos de la semana",det,[11,10,10,14,20,16,8,8,10,11,11,11,28,40]);
+    det.push([addDays(w,a.d),DAYS[a.d],TNAME[a.t],loc(a.loc)?.name||a.loc,puesto(a.loc,a.p)?.name||a.p,pname(a.s),a.in,a.out||cierre(a.loc,a.d,a.t),+hoursOf(a).toFixed(2),a.realIn||"",a.realOut||"",rh==null?"":+rh.toFixed(2),plusPay(w,a)?"Sí":"",a.note||"",rn(`${a.loc}|${a.d}|${a.t}`),nv(`${a.loc}|${a.d}|${a.t}`)])});
+  addSheet(wb,"Turnos de la semana",det,[11,10,10,14,20,16,8,8,10,11,11,11,12,28,18,40]);
   const {from,to,rows,byLoc}=hoursData();
-  const hs=[[`Horas del ${fmtDM(from)} al ${fmtDM(to)}`],[],["Persona","Horas planificadas","Horas reales","Turnos con horas reales","Turnos","Días","Dobles","Costo ($)"]];
-  Object.entries(rows).sort((a,b)=>b[1].plan-a[1].plan).forEach(([id,r])=>hs.push([pname(id),+r.plan.toFixed(2),r.fichados?+r.real.toFixed(2):"",r.fichados,r.turnos,r.dias,r.dobles,Math.round(r.cost)]));
+  const hs=[[`Horas del ${fmtDM(from)} al ${fmtDM(to)}`],[],["Persona","Horas planificadas","Horas reales","Turnos con horas reales","Horas dom. mediodía y feriado","Turnos","Días","Dobles","Costo ($)"]];
+  Object.entries(rows).sort((a,b)=>b[1].plan-a[1].plan).forEach(([id,r])=>hs.push([pname(id),+r.plan.toFixed(2),r.fichados?+r.real.toFixed(2):"",r.fichados,+r.plus.toFixed(2),r.turnos,r.dias,r.dobles,Math.round(r.cost)]));
   hs.push([]);hs.push(["Locación","Horas","Costo ($)"]);
   S.config.locations.forEach(l=>{if(byLoc[l.id])hs.push([l.name,+byLoc[l.id].h.toFixed(2),Math.round(byLoc[l.id].cost)])});
-  addSheet(wb,"Horas y costos",hs,[20,18,14,22,8,8,8,12]);
+  if(recargo())hs.push([],[`Recargo de domingo al mediodía y feriados: ${recargo()}% (incluido en el costo)`]);
+  addSheet(wb,"Horas y costos",hs,[20,18,14,22,22,8,8,8,12]);
   const au=S.ausencias.filter(x=>x.to>=w&&x.from<=addDays(w,6));
   if(au.length)addSheet(wb,"Ausencias",[["Persona","Tipo","Desde","Hasta","Nota"],...au.map(x=>[pname(x.s),TIPOS[x.tipo],x.from,x.to,x.nota||""])],[18,16,11,11,30]);
   return wb;
@@ -947,18 +1042,18 @@ function buildWorkbook(){
 async function downloadXLSX(){
   if(!window.XLSX){toast("No se pudo cargar el generador de Excel. Recargá la página.");return}
   const data=XLSX.write(buildWorkbook(),{bookType:"xlsx",type:"array"});
-  saveFile(`turnos-osvaldo-${S.week}.xlsx`,new Blob([data],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));toast("Excel descargado")
+  saveFile(`${S.view==="calendario"?"calendario":"turnos"}-osvaldo-${S.week}.xlsx`,new Blob([data],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));toast("Excel descargado")
 }
 
 /* ---------- CSV ---------- */
 async function downloadCSV(){
   const {from,to}=hoursData();
   const q=v=>`"${String(v).replace(/"/g,'""')}"`;
-  const lines=[["Fecha","Turno","Persona","Locación","Puesto","Entrada plan.","Salida plan.","Horas plan.","Entrada real","Salida real","Horas reales","Valor hora","Costo"].join(",")];
+  const lines=[["Fecha","Turno","Persona","Locación","Puesto","Entrada plan.","Salida plan.","Horas plan.","Entrada real","Salida real","Horas reales","Dom. mediodía o feriado","Valor hora","Recargo %","Costo"].join(",")];
   for(const [w,doc] of Object.entries(S.weeks))for(const a of doc.assign||[]){
     const date=addDays(w,a.d);if(date<from||date>to)continue;
     const h=hoursOf(a),rh=realHours(a);
-    lines.push([date,TNAME[a.t],pname(a.s),loc(a.loc)?.name||a.loc,puesto(a.loc,a.p)?.name||a.p,a.in,a.out||cierre(a.loc,a.d,a.t),h.toFixed(2),a.realIn||"",a.realOut||"",rh==null?"":rh.toFixed(2),rate(a),Math.round((rh??h)*rate(a))].map(q).join(","));
+    lines.push([date,TNAME[a.t],pname(a.s),loc(a.loc)?.name||a.loc,puesto(a.loc,a.p)?.name||a.p,a.in,a.out||cierre(a.loc,a.d,a.t),h.toFixed(2),a.realIn||"",a.realOut||"",rh==null?"":rh.toFixed(2),plusPay(w,a)?"Sí":"",rate(a),plusPay(w,a)?recargo():0,Math.round((rh??h)*rate(a)*(plusPay(w,a)?1+recargo()/100:1))].map(q).join(","));
   }
   saveFile(`horas-${from}-a-${to}.csv`,new Blob(["\ufeff"+lines.join("\n")],{type:"text/csv"}));toast("CSV descargado")
 }
@@ -985,10 +1080,11 @@ document.addEventListener("click",e=>{
     const a=mine.find(x=>x.loc===S.loc)||mine[0];
     if(a){S.editing={type:"shift",byPerson:true,a:{...a}};renderModal();return}
     const au=ausente(sid,addDays(S.week,day));if(au){toast(`${pname(sid)} tiene ${TIPOS[au.tipo].toLowerCase()} ese día.`);return}
-    S.editing={type:"shift",byPerson:true,isNew:true,a:{id:uid(),loc:S.loc,p:defaultPuesto(sid,S.loc),d:day,t:tt,s:sid,in:S.config.entradas?.[tt]||(tt==="a"?"11:30":"19:30"),out:"",note:""}};renderModal();return}
+    S.editing={type:"shift",byPerson:true,isNew:true,a:{id:uid(),loc:S.loc,p:defaultPuesto(sid,S.loc,day,tt),d:day,t:tt,s:sid,in:S.config.entradas?.[tt]||(tt==="a"?"11:30":"19:30"),out:"",note:""}};renderModal();return}
   if(d.edit){const a=weekAssign(S.week).find(x=>x.id===d.edit);if(a){S.editing={type:"shift",a:{...a}};renderModal()}return}
   if(t.id==="mCancel"){S.editing=null;renderModal();return}
   if(t.id==="mSave"){readShiftForm();const a=S.editing.a;if(!a.s)return;
+    const occ=occupant(a);if(occ){toast(`Ese puesto ya lo tiene ${pname(occ.s)}.`);renderModal();return}
     const old=weekAssign(S.week).find(x=>x.id===a.id);
     setWeek(S.week,weekAssign(S.week).filter(x=>x.id!==a.id).concat(a));
     log(old?(old.s!==a.s?`Cambió ${pname(old.s)} por ${pname(a.s)} en ${puesto(a.loc,a.p)?.name} (${loc(a.loc)?.name}), ${whenTxt(S.week,a)}.`:`Editó el turno de ${pname(a.s)} en ${puesto(a.loc,a.p)?.name} (${loc(a.loc)?.name}), ${whenTxt(S.week,a)}: ${shiftLabel(a)}.`)
@@ -1007,11 +1103,12 @@ document.addEventListener("click",e=>{
     S.plantillas.push({id,...body});persist("plantillas/"+id,body);log(`Guardó la semana tipo "${n}".`);S.tplSel=id;S.editing=null;render();toast("Semana tipo guardada");return}
   if(d.tpldel){if(S.confirm!=="tpldel-"+d.tpldel){S.confirm="tpldel-"+d.tpldel;render();return}
     const p=S.plantillas.find(x=>x.id===d.tpldel);S.plantillas=S.plantillas.filter(x=>x.id!==d.tpldel);removeDoc("plantillas",d.tpldel);log(`Borró la semana tipo "${p?.name}".`);S.confirm="";render();return}
-  if(d.nota){S.editing={type:"nota",key:d.nota,text:weekNotas(S.week)[d.nota]||""};renderModal();return}
-  if(t.id==="nSave"||t.id==="nDel"){const k=S.editing.key,txt=t.id==="nDel"?"":document.getElementById("nTxt").value.trim();
+  if(d.nota){S.editing={type:"nota",key:d.nota,text:weekNotas(S.week)[d.nota]||"",resp:weekResp(S.week)[d.nota]||""};renderModal();return}
+  if(t.id==="nSave"||t.id==="nDel"){const k=S.editing.key,del=t.id==="nDel",txt=del?"":document.getElementById("nTxt").value.trim(),rs=del?"":document.getElementById("nResp").value;
     const notas={...weekNotas(S.week)};if(txt)notas[k]=txt;else delete notas[k];
-    S.weeks[S.week]={...(S.weeks[S.week]||{assign:[]}),notas};saveWeek(S.week);
-    const [l,dd,tt]=k.split("|");log(`${txt?"Actualizó":"Borró"} la nota del turno ${TNAME[tt].toLowerCase()} del ${DAYS[+dd].toLowerCase()} ${fmtDM(addDays(S.week,+dd))} en ${loc(l)?.name}.`);
+    const resp={...weekResp(S.week)};if(rs)resp[k]=rs;else delete resp[k];
+    S.weeks[S.week]={...(S.weeks[S.week]||{assign:[]}),notas,resp};saveWeek(S.week);
+    const [l,dd,tt]=k.split("|");log(`${txt||rs?"Actualizó":"Borró"} las novedades${rs?" (responsable: "+pname(rs)+")":""} del turno ${TNAME[tt].toLowerCase()} del ${DAYS[+dd].toLowerCase()} ${fmtDM(addDays(S.week,+dd))} en ${loc(l)?.name}.`);
     S.editing=null;render();return}
   if(t.id==="newPerson"){S.editing={type:"person",isNew:true,p:{id:uid(),name:"",loc:S.loc,puestos:[],active:true}};renderModal();return}
   if(d.person){const p=person(d.person);if(p){S.editing={type:"person",p:structuredClone(p)};renderModal()}return}
@@ -1028,11 +1125,13 @@ document.addEventListener("click",e=>{
     const x={id:uid(),s,tipo:document.getElementById("auT").value,from,to,nota:document.getElementById("auN").value.trim()};
     S.ausencias.push(x);const {id,...body}=x;persist("ausencias/"+id,body);log(`Cargó ${TIPOS[x.tipo].toLowerCase()} para ${pname(s)} del ${fmtDM(from)} al ${fmtDM(to)}.`);render();toast("Ausencia cargada");return}
   if(d.audel){const x=S.ausencias.find(a=>a.id===d.audel);S.ausencias=S.ausencias.filter(a=>a.id!==d.audel);removeDoc("ausencias",d.audel);if(x)log(`Quitó ${TIPOS[x.tipo].toLowerCase()} de ${pname(x.s)} (${fmtDM(x.from)} al ${fmtDM(x.to)}).`);render();return}
-  if(t.id==="espAdd"){const f=document.getElementById("espF").value,n=document.getElementById("espN").value.trim()||"Feriado";if(!f){toast("Elegí una fecha.");return}
-    (S.config.especiales??={})[f]=n;saveConfig();log(`Marcó el ${fmtDM(f)} como ${n}.`);render();return}
+  if(t.id==="espAdd"){const f=document.getElementById("espF").value,fer=document.getElementById("espT").value==="feriado",n=document.getElementById("espN").value.trim()||(fer?"Feriado":"Evento");if(!f){toast("Elegí una fecha.");return}
+    (S.config.especiales??={})[f]={n,f:fer};saveConfig();log(`Marcó el ${fmtDM(f)} como ${n}.`);render();return}
   if(d.espdel){delete S.config.especiales[d.espdel];saveConfig();log(`Quitó el día especial del ${fmtDM(d.espdel)}.`);render();return}
   if(t.id==="saveImg"){savePNG(buildCanvas(),`horario-${slug(loc(S.loc).name)}-${S.week}.png`);return}
   if(t.id==="copyImg"){copyImage();return}
+  if(t.id==="calImg"){document.fonts?.ready.then(()=>savePNG(buildCalCanvas(),`calendario-${S.calLoc==="all"?"osvaldo":slug(loc(S.calLoc)?.name||"")}-${S.week}.png`));return}
+  if(t.id==="calCopy"){copyImage(buildCalCanvas);return}
   if(t.id==="miImg"){document.fonts?.ready.then(()=>savePNG(buildPersonCanvas(S.miId),`mi-horario-${slug(pname(S.miId))}-${S.week}.png`));return}
   if(t.id==="miLink"){copyText(APP_URL+"#mi-"+S.miId,"Link copiado");return}
   if(t.id==="csv"){downloadCSV();return}
@@ -1050,6 +1149,7 @@ document.addEventListener("change",e=>{
   if(d.entrada){(S.config.entradas??={})[d.entrada]=t.value;saveConfig();return}
   if(d.cob){const [k,f]=d.cob.split("|");const c=(S.config.cobertura??={})[k]??={};const v=parseInt(t.value,10);if(v>0)c[f]=v;else delete c[f];saveConfig();log(`Cambió la cobertura mínima de ${loc(S.loc).name}.`);return}
   if(d.vh){const v=Number(t.value);(S.config.valorHora??={});if(v>0)S.config.valorHora[d.vh]=v;else delete S.config.valorHora[d.vh];saveConfig();log(`Cambió el valor hora de ${loc(S.loc).name}.`);return}
+  if(t.id==="recargo"){S.config.recargo=Math.max(0,Number(t.value)||0);saveConfig();log("Cambió el recargo de domingo al mediodía y feriados.");return}
   if(d.regla){(S.config.reglas??={})[d.regla]=Number(t.value)||0;saveConfig();log("Cambió las reglas de descanso y horas.");return}
   if(d.real){const [id,f]=d.real.split("|");const a=weekAssign(S.week).find(x=>x.id===id);if(!a)return;
     const list=weekAssign(S.week).map(x=>x.id===id?{...x,[f]:t.value}:x);list.forEach(x=>{if(!x.realIn)delete x.realIn;if(!x.realOut)delete x.realOut});
@@ -1080,7 +1180,7 @@ document.addEventListener("submit",async e=>{
   const db=window.supabase.createClient(C.supabaseUrl,C.supabaseKey);S.db=db;
   function applyCache(){
     const cfg=cache.get("config/main");
-    if(cfg){const c=structuredClone(cfg);c.cierres??={};c.valorHora=structuredClone(cache.get("privado/costos")?.valorHora||{});S.config=c;if(!loc(S.loc))S.loc=c.locations[0]?.id}
+    if(cfg){const c=structuredClone(cfg);c.cierres??={};c.valorHora=structuredClone(cache.get("privado/costos")?.valorHora||{});c.recargo=Number(cache.get("privado/costos")?.recargo)||0;S.config=c;if(!loc(S.loc))S.loc=c.locations[0]?.id}
     const pre=p=>[...cache].filter(([k])=>k.startsWith(p+"/")).map(([k,v])=>({id:k.slice(p.length+1),...structuredClone(v)}));
     S.staff=pre("staff");
     S.weeks=Object.fromEntries(pre("weeks").map(({id,...v})=>[id,v]));
