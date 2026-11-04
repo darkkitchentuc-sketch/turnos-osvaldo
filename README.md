@@ -24,6 +24,9 @@ Planificación de turnos del personal para Barrio Norte y Producción. Es una p�
 - `supabase/schema.sql`: tablas y permisos.
 
 ## Fichero (entrada y salida)
-1. En Supabase → SQL Editor, pegá y corré `supabase/fichadas.sql` (una sola vez).
-2. En **Personas y puestos**, a cada persona cargale DNI y un PIN de 4 a 6 números.
+1. En Supabase → SQL Editor, pegá y corré `supabase/fichadas.sql` y después `supabase/cambios.sql`.
+2. En **Personas y puestos**, a cada persona cargale su DNI.
 3. La pantalla para fichar es el link de la app con `#fichar` al final. Las marcas se ven en la pestaña **Fichadas** y completan las horas reales.
+
+## Cambios de turno
+Cada persona pide el cambio en **Cambios de turno** con su DNI. Llega un mail al email de avisos (se configura en **Aprobación de cambios**; la primera vez FormSubmit manda un mail para activarlo). Al aprobar, el calendario se actualiza solo.
