@@ -389,7 +389,7 @@ function weekAssign(w){return S.weeks[w]?.assign||[]}
 function weekNotas(w){return S.weeks[w]?.notas||{}}
 function weekResp(w){return S.weeks[w]?.resp||{}}
 function ausente(sid,date){return S.ausencias.find(x=>x.s===sid&&x.from<=date&&date<=x.to)}
-function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>t.hidden=true,2600)}
+function toast(msg,ms=2600){const t=document.getElementById("toast");t.textContent=msg;t.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>t.hidden=true,ms)}
 function sortedStaff(){return [...S.staff].sort((a,b)=>a.name.localeCompare(b.name,"es"))}
 function shortName(n){const w=n.trim().split(/\s+/);return w.length>1?w[0]+" "+w[1][0]+".":n}
 function shiftLabel(a){return `${shortT(a.in)} a ${a.out?shortT(a.out)+"hs":"cierre"}`}
@@ -803,9 +803,17 @@ async function cxSend(){const C=S.cx,s=findShift(C.sel);if(!s){toast("Elegí un 
   const m=await cxLoad(C.dni);if(m.ok)C.mis=m.solicitudes||[];render();toast("Pedido enviado. Te avisamos acá cuando se resuelva.")}
 /* Aviso por mail al encargado (FormSubmit: la primera vez llega un mail para activarlo) */
 function avisoEmail(){return (S.config.avisoEmail||"").trim()}
-async function enviarAviso(asunto,campos){const to=avisoEmail();if(!to)return false;
-  try{const r=await fetch("https://formsubmit.co/ajax/"+encodeURIComponent(to),{method:"POST",headers:{"Content-Type":"application/json",Accept:"application/json"},
-    body:JSON.stringify({_subject:asunto,_template:"table",_captcha:"false",...campos})});return r.ok}catch{return false}}
+/* Dos formas: un email (vía FormSubmit) o el link de un script de Google que manda el mail desde tu Gmail (ver supabase/aviso-gmail.gs). */
+async function enviarAviso(asunto,campos){const to=avisoEmail();if(!to)return {ok:false,msg:"no hay email cargado"};
+  const body=JSON.stringify({_subject:asunto,_template:"table",_captcha:"false",...campos});
+  if(/^https:\/\/script\.google\.com\//.test(to)){
+    try{await fetch(to,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain"},body});return {ok:true,msg:"Mail enviado por Gmail. Revisá tu bandeja."}}
+    catch(e){return {ok:false,msg:"no se pudo conectar con Google ("+(e?.message||"error")+")"}}}
+  try{const r=await fetch("https://formsubmit.co/ajax/"+to.replace(/[^\w.@+-]/g,""),{method:"POST",headers:{"Content-Type":"application/json",Accept:"application/json"},body});
+    let j={};try{j=await r.json()}catch{}
+    if(r.ok&&String(j.success)!=="false")return {ok:true,msg:"Mail enviado. Si es la primera vez, revisá tu correo para activarlo."};
+    return {ok:false,msg:"FormSubmit respondió: "+(j.message||("error "+r.status))}}
+  catch(e){return {ok:false,msg:"el navegador no pudo conectarse con FormSubmit ("+(e?.message||"error")+"). Probá con la opción de Gmail."}}}
 
 /* Aprobación de cambios (encargados) */
 function solCheck(x){
@@ -836,7 +844,8 @@ function viewAprobar(){
       <div class="panel"><h2>Resueltos</h2>${res.length?`<div class="list">${res.map(x=>`<div class="item"><span><b>${esc(pname(x.staff_id))}</b> · ${esc(x.resumen||"")}<br><span class="pill ${x.estado==="aprobada"?"acc":""}">${CEST[x.estado]}</span> <span class="hint">${x.resuelto_por?esc(x.resuelto_por):""}${x.respuesta?" · "+esc(x.respuesta):""}</span></span></div>`).join("")}</div>`:`<p class="hint">Todavía no hay pedidos resueltos.</p>`}</div>
       <div class="panel"><h2>Aviso por mail</h2>
         <p class="hint">Cada pedido nuevo manda un mail a esta dirección. La primera vez llega un mail de FormSubmit para activar el aviso: abrilo y tocá "Activate Form".</p>
-        <div class="row"><input type="text" id="avisoEmail" inputmode="email" value="${esc(avisoEmail())}" placeholder="email@ejemplo.com" style="flex:1 1 220px" aria-label="Email para avisos"><button id="avisoTest">Mandar mail de prueba</button></div>
+        <p class="hint">Si no funciona, podés mandarlo desde tu propio Gmail: pegá acá el link de la aplicación web de Google (empieza con https://script.google.com/). Los pasos están en el archivo aviso-gmail.gs.</p>
+        <div class="row"><input type="text" id="avisoEmail" inputmode="email" value="${esc(avisoEmail())}" placeholder="email@ejemplo.com o link de Google" style="flex:1 1 220px" aria-label="Email o link para avisos"><button id="avisoTest">Mandar mail de prueba</button></div>
       </div>
     </div>
   </section>`;
@@ -1448,7 +1457,7 @@ document.addEventListener("click",e=>{
     const m=await cxLoad(S.cx.dni);if(m.ok)S.cx.mis=m.solicitudes||[];render();toast("Pedido cancelado")})();return}
   if(d.apr){resolver(d.apr,true);return}
   if(d.rej){resolver(d.rej,false);return}
-  if(t.id==="avisoTest"){(async()=>{if(!avisoEmail()){toast("Escribí un email.");return}const ok=await enviarAviso("Prueba de avisos de Turnos Osvaldo",{Mensaje:"Si te llegó este mail, los avisos de pedidos de cambio funcionan."});toast(ok?"Mail enviado. Si es la primera vez, revisá tu correo para activarlo.":"No se pudo mandar el mail.")})();return}
+  if(t.id==="avisoTest"){(async()=>{if(!avisoEmail()){toast("Escribí un email.");return}const r=await enviarAviso("Prueba de avisos de Turnos Osvaldo",{Mensaje:"Si te llegó este mail, los avisos de pedidos de cambio funcionan."});toast(r.ok?r.msg:"No se pudo mandar el mail: "+r.msg,9000)})();return}
   if(t.id==="fichLink"){copyText(APP_URL+"#fichar","Link copiado");return}
   if(t.id==="fmAdd"){const sid=document.getElementById("fmP").value,tipo=document.getElementById("fmT").value,dd=document.getElementById("fmD").value,hh=document.getElementById("fmH").value;
     if(!sid||!dd||!hh){toast("Elegí persona, fecha y hora.");return}
