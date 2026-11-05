@@ -595,8 +595,8 @@ function viewCalendario(){
       ${libres.length?`<div class="libres"><b>Libres:</b> ${libres.map(p=>esc(p.name)).join(", ")}</div>`:""}</article>`;
   }).join("");
   return `<section style="display:grid;gap:12px">
-    <div class="bar">${filt}<div class="group"><button class="primary" id="calImg">Descargar imagen para WhatsApp</button><button id="calCopy">Copiar imagen</button><button id="xlsx">Descargar Excel</button></div></div>
-    <p class="hint" data-editonly>Tocá un turno para editarlo. La imagen y el Excel salen con el filtro de locación elegido.</p>
+    <div class="bar">${filt}<div class="group">${S.config.locations.map((l,i)=>`<button ${i?"":`class="primary"`} data-calimg="${l.id}">Imagen ${esc(l.name)}</button><button data-calcopy="${l.id}">Copiar ${esc(l.name)}</button>`).join("")}<button id="xlsx">Descargar Excel</button></div></div>
+    <p class="hint" data-editonly>Tocá un turno para editarlo. Cada locación tiene su propia imagen; el Excel sale con el filtro elegido.</p>
     <div class="calwrap"><div class="cal">${days}</div></div>
     ${list.length?"":`<p class="hint">Esta semana todavía no tiene turnos. Cargalos en <b>Planificar semana</b>.</p>`}
   </section>`;
@@ -1265,39 +1265,59 @@ function buildPersonCanvas(id){
   return cv;
 }
 /* Imagen del calendario: un bloque por día, almuerzo y cena lado a lado, con novedades */
-function buildCalCanvas(){
-  const w=S.week,sc=2,W=820,pad=16,colW=(W-pad*2-12)/2,LH=18;
-  const locs=S.config.locations.filter(l=>S.calLoc==="all"||l.id===S.calLoc);
+function buildCalCanvas(only){
+  const w=S.week,sc=2,W=860,pad=16,gap=12,colW=(W-pad*2-gap)/2,inner=colW-20;
+  const locs=S.config.locations.filter(l=>only?l.id===only:(S.calLoc==="all"||l.id===S.calLoc));
   const cv=document.createElement("canvas"),g=cv.getContext("2d");
   const list=weekAssign(w),n=weekNotas(w),r=weekResp(w);
+  const INK="#16302D",MUTED="#4A5E5A",AMB="#8A5A00",MONO=(wt,sz)=>`${wt} ${sz}px 'IBM Plex Mono', ui-monospace, monospace`;
+  const lines=(f,t,max)=>{g.font=f;return wrap(g,t,max)};
+  /* Cada turno: encabezado, novedades del turno (si hay) y una ficha por persona */
+  function turno(L,d,t){const k=`${L.id}|${d}|${t}`,blocks=[];
+    const nl=noteLines(n[k]),rid=r[k];
+    if(nl.length||rid){const ls=[];if(rid)ls.push([FONT(700,13),"Responsable: "+pname(rid),AMB]);
+      if(nl.length)ls.push([FONT(800,11),"NOVEDADES DEL TURNO",AMB]);
+      nl.forEach(x=>lines(FONT(500,13),"• "+x,inner-16).forEach(z=>ls.push([FONT(500,13),z,INK])));
+      blocks.push({kind:"nota",ls,h:ls.length*18+12})}
+    const here=list.filter(a=>a.loc===L.id&&a.d===d&&a.t===t).sort((a,b)=>(a.in||"").localeCompare(b.in||"")||pname(a.s).localeCompare(pname(b.s)));
+    for(const a of here){const sub=[puesto(a.loc,a.p)?.name||""];const ls=[];
+      if(a.note)lines(FONT(600,12),"Nota: "+a.note,inner).forEach(z=>ls.push(z));
+      blocks.push({kind:"p",a,sub:sub.join(""),ls,h:40+ls.length*16})}
+    if(!here.length)blocks.push({kind:"none",h:24});
+    return {t,blocks,h:30+blocks.reduce((s,x)=>s+x.h+4,0)+6}}
   const days=[];
-  for(let d=0;d<7;d++){const secs=[];
-    for(const L of locs){const cols=["a","c"].map(t=>{const rows=[];const k=`${L.id}|${d}|${t}`;
-        if(r[k])rows.push([FONT(700,13),"Responsable: "+pname(r[k]),"#8A5A00"]);
-        for(const s of noteLines(n[k])){g.font=FONT(500,12);wrap(g,"• "+s,colW-20).forEach(x=>rows.push([FONT(500,12),x,"#8A5A00"]))}
-        const here=list.filter(a=>a.loc===L.id&&a.d===d&&a.t===t).sort((a,b)=>(a.in||"").localeCompare(b.in||""));
-        for(const a of here)rows.push([FONT(600,13),fitW(g,FONT(600,13),`${pname(a.s)} · ${puesto(a.loc,a.p)?.name||""} · ${shortT(a.in)}–${a.out?shortT(a.out):"cierre"}`,colW-20),"#16302D"]);
-        if(!here.length)rows.push([FONT(400,13),"Sin personal","#5D706C"]);
-        return {t,rows}});
-      const bh=22+Math.max(...cols.map(c=>c.rows.length))*LH+6,h=(locs.length>1?20:4)+bh+8;secs.push({L,cols,h,bh})}
-    days.push({d,secs,h:30+secs.reduce((s,x)=>s+x.h,0)+8})}
-  const titleH=70,H=titleH+days.reduce((s,x)=>s+x.h,0)+8;
+  for(let d=0;d<7;d++){const secs=locs.map(L=>{const cols=["a","c"].map(t=>turno(L,d,t));return {L,cols,bh:Math.max(...cols.map(c=>c.h))}});
+    days.push({d,secs,h:32+secs.reduce((s,x)=>s+x.bh+(locs.length>1?24:8),0)+6})}
+  const titleH=74,H=titleH+days.reduce((s,x)=>s+x.h,0)+10;
   cv.width=W*sc;cv.height=H*sc;g.scale(sc,sc);
   g.fillStyle="#FFFFFF";g.fillRect(0,0,W,H);g.textBaseline="top";g.textAlign="left";
-  g.fillStyle="#16302D";g.font="800 24px 'Bricolage Grotesque', system-ui, sans-serif";g.fillText(locs.length===1?locs[0].name.toUpperCase():"OSVALDO · CALENDARIO",pad,16);
-  g.font=FONT(500,14);g.fillStyle="#5D706C";g.fillText(`Semana del ${fmtDM(w)} al ${fmtDM(addDays(w,6))}`,pad,48);
+  g.fillStyle=INK;g.font="800 26px 'Bricolage Grotesque', system-ui, sans-serif";g.fillText(locs.length===1?locs[0].name.toUpperCase():"OSVALDO · CALENDARIO",pad,14);
+  g.font=FONT(600,15);g.fillStyle=MUTED;g.fillText(`Semana del ${fmtDM(w)} al ${fmtDM(addDays(w,6))}`,pad,48);
   let y=titleH;
   for(const D of days){
-    g.fillStyle="#16302D";g.fillRect(0,y,W,26);g.fillStyle="#FFFFFF";g.font=FONT(700,14);
+    g.fillStyle=INK;g.fillRect(0,y,W,28);g.fillStyle="#FFFFFF";g.font=FONT(800,15);
     const e=especial(w,D.d);g.fillText(`${DAYS[D.d].toUpperCase()} ${fmtDM(addDays(w,D.d))}${e?" · "+e:isAlta(w,D.d)?" · alta":""}`,pad,y+6);
-    let yy=y+30;
+    let yy=y+34;
     for(const s of D.secs){
-      if(locs.length>1){g.fillStyle="#5D706C";g.font=FONT(700,12);g.fillText(s.L.name.toUpperCase(),pad,yy+4)}
-      s.cols.forEach((c,i)=>{const x=pad+i*(colW+12),top=yy+(locs.length>1?20:4);
-        g.fillStyle=c.t==="a"?"#F7C4AE":"#FBDDBF";g.fillRect(x,top,colW,s.bh);
-        g.fillStyle="#16302D";g.font=FONT(700,12);g.fillText(`${TNAME[c.t].toUpperCase()} · CIERRE ${shortT(cierre(s.L.id,D.d,c.t))}${c.t==="a"&&plusPay(w,{d:D.d,t:"a"})?" · $+":""}`,x+8,top+4);
-        c.rows.forEach(([f,t,col],k)=>{g.font=f;g.fillStyle=col;g.fillText(t,x+8,top+22+k*LH)})});
-      yy+=s.h}
+      if(locs.length>1){g.fillStyle=MUTED;g.font=FONT(800,12);g.fillText(s.L.name.toUpperCase(),pad,yy);yy+=18}
+      s.cols.forEach((c,i)=>{const x=pad+i*(colW+gap);let ty=yy;
+        g.fillStyle=c.t==="a"?"#F7C4AE":"#FBDDBF";g.fillRect(x,ty,colW,s.bh);
+        g.fillStyle=INK;g.font=FONT(800,14);g.fillText(TNAME[c.t].toUpperCase()+(c.t==="a"&&plusPay(w,{d:D.d,t:"a"})?" · $+":""),x+10,ty+8);
+        const ct="Cierre "+cierre(s.L.id,D.d,c.t);g.font=MONO(700,14);g.textAlign="right";g.fillText(ct,x+colW-10,ty+8);g.textAlign="left";
+        ty+=30;
+        for(const b of c.blocks){
+          if(b.kind==="nota"){g.fillStyle="#FFF0CF";g.fillRect(x+6,ty,colW-12,b.h);g.fillStyle=AMB;g.fillRect(x+6,ty,4,b.h);
+            b.ls.forEach(([f,t,col],k)=>{g.font=f;g.fillStyle=col;g.fillText(t,x+16,ty+6+k*18)})}
+          else if(b.kind==="none"){g.font=FONT(500,13);g.fillStyle=MUTED;g.fillText("Sin personal",x+10,ty+4)}
+          else{const a=b.a;g.fillStyle="rgba(255,255,255,.55)";g.fillRect(x+6,ty,colW-12,b.h);
+            const hr=`${a.in} a ${a.out||cierre(a.loc,a.d,a.t)}`;g.font=MONO(700,15);const hw=g.measureText(hr).width;
+            g.fillStyle=INK;g.textAlign="right";g.fillText(hr,x+colW-14,ty+5);g.textAlign="left";
+            g.font=FONT(800,16);g.fillText(fit(g,pname(a.s),inner-hw-14),x+12,ty+4);
+            g.font=FONT(500,12);g.fillStyle=MUTED;g.fillText(fit(g,b.sub+(a.out?"":" · hasta el cierre"),inner),x+12,ty+24);
+            b.ls.forEach((z,k)=>{g.font=FONT(600,12);g.fillStyle=AMB;g.fillText(z,x+12,ty+40+k*16)})}
+          ty+=b.h+4}
+      });
+      yy+=s.bh+(locs.length>1?6:8)}
     y+=D.h}
   return cv;
 }
@@ -1457,8 +1477,8 @@ document.addEventListener("click",e=>{
   if(d.espdel){delete S.config.especiales[d.espdel];saveConfig();log(`Quitó el día especial del ${fmtDM(d.espdel)}.`);render();return}
   if(t.id==="saveImg"){savePNG(buildCanvas(),`horario-${slug(loc(S.loc).name)}-${S.week}.png`);return}
   if(t.id==="copyImg"){copyImage();return}
-  if(t.id==="calImg"){document.fonts?.ready.then(()=>savePNG(buildCalCanvas(),`calendario-${S.calLoc==="all"?"osvaldo":slug(loc(S.calLoc)?.name||"")}-${S.week}.png`));return}
-  if(t.id==="calCopy"){copyImage(buildCalCanvas);return}
+  if(d.calimg){const id=d.calimg;document.fonts?.ready.then(()=>savePNG(buildCalCanvas(id),`calendario-${slug(loc(id)?.name||"")}-${S.week}.png`));return}
+  if(d.calcopy){const id=d.calcopy;copyImage(()=>buildCalCanvas(id));return}
   if(t.id==="miImg"){document.fonts?.ready.then(()=>savePNG(buildPersonCanvas(S.miId),`mi-horario-${slug(pname(S.miId))}-${S.week}.png`));return}
   if(t.id==="miLink"){copyText(APP_URL+"#mi-"+S.miId,"Link copiado");return}
   if(t.id==="csv"){downloadCSV();return}
