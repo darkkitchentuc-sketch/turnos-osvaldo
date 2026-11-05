@@ -85,6 +85,10 @@ thead th{font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;color:va
 .plan td.cell.a{background:color-mix(in srgb,var(--lunch) 35%,var(--surface))}
 .plan td.cell.c{background:color-mix(in srgb,var(--dinner) 35%,var(--surface))}
 .plan td.cell.first{border-left:1px solid var(--muted)}
+.chip.area{border-left:4px solid var(--area)}
+.chip.area small{color:var(--area);font-weight:600}
+.alegend{display:flex;gap:12px;flex-wrap:wrap;font-size:.78rem}
+.alegend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--area);margin-right:5px;vertical-align:-1px}
 .chip{display:block;width:100%;text-align:left;border-radius:6px;padding:3px 6px;margin-bottom:3px;border:1px solid transparent;font-size:.8rem;line-height:1.25}
 .chip.a{background:var(--lunch);color:var(--lunch-ink)}
 .chip.c{background:var(--dinner);color:var(--dinner-ink)}
@@ -394,6 +398,10 @@ function weekResp(w){return S.weeks[w]?.resp||{}}
 function ausente(sid,date){return S.ausencias.find(x=>x.s===sid&&x.from<=date&&date<=x.to)}
 function toast(msg,ms=2600){const t=document.getElementById("toast");t.textContent=msg;t.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>t.hidden=true,ms)}
 function sortedStaff(){return [...S.staff].sort((a,b)=>a.name.localeCompare(b.name,"es"))}
+/* Color por área del puesto: cocina, salón y producción */
+const AREA_COL={cocina:"#C2410C",salon:"#1D4ED8",produccion:"#15803D"};
+function areaKey(l,p){const a=(puesto(l,p)?.area||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");return a.includes("salon")?"salon":a.includes("produc")?"produccion":a.includes("cocina")?"cocina":"otro"}
+function areaCol(l,p){return AREA_COL[areaKey(l,p)]||"#4A5E5A"}
 function shortName(n){const w=n.trim().split(/\s+/);return w.length>1?w[0]+" "+w[1][0]+".":n}
 function shiftLabel(a){return `${shortT(a.in)} a ${a.out?shortT(a.out)+"hs":"cierre"}`}
 function dname(day){return day<0?DAYS[day+7].toLowerCase()+" anterior":DAYS[day].toLowerCase()}
@@ -588,7 +596,7 @@ function viewCalendario(){
     const blocks=locs.map(l=>`<div class="calloc"><h4>${esc(l.name)}</h4>${TURNOS.map(t=>{
       const here=list.filter(a=>a.loc===l.id&&a.d===d&&a.t===t.k).sort((a,b)=>(a.in||"").localeCompare(b.in||""));
       const cobMsg=av.msgs.find(m=>m.kind==="cob"&&m.loc===l.id&&m.d===d&&m.t===t.k);
-      return `<div class="calturn"><span>${t.name} · cierre ${shortT(cierre(l.id,d,t.k))}</span>${noteHTML(notas[`${l.id}|${d}|${t.k}`],resp[`${l.id}|${d}|${t.k}`])}${here.length?here.map(a=>`<button class="chip ${t.k} ${chipClass(a,av)}" data-edit="${a.id}"><b>${esc(pname(a.s))}</b><span class="mono">${esc(shortT(a.in))}–${a.out?esc(shortT(a.out)):"cierre"}</span><small>${esc(puesto(a.loc,a.p)?.name||"")}${a.note?" · "+esc(a.note):""}</small></button>`).join(""):`<span class="none">Sin personal</span>`}
+      return `<div class="calturn"><span>${t.name} · cierre ${shortT(cierre(l.id,d,t.k))}</span>${noteHTML(notas[`${l.id}|${d}|${t.k}`],resp[`${l.id}|${d}|${t.k}`])}${here.length?here.map(a=>`<button class="chip ${t.k} ${chipClass(a,av)} area" style="--area:${areaCol(a.loc,a.p)}" data-edit="${a.id}"><b>${esc(pname(a.s))}</b><span class="mono">${esc(shortT(a.in))}–${a.out?esc(shortT(a.out)):"cierre"}</span><small>${esc(puesto(a.loc,a.p)?.name||"")}${a.note?" · "+esc(a.note):""}</small></button>`).join(""):`<span class="none">Sin personal</span>`}
         ${cobMsg?`<span class="falta">${esc(cobMsg.text.split(": ")[1])}</span>`:""}</div>`}).join("")}</div>`).join("");
     return `<article class="calday ${date===today?"today":""}"><header><strong>${n} ${fmtDM(date)}</strong>${dayTag(S.week,d)}</header>${blocks}
       ${aus.length?`<div class="ausentes">${aus.map(p=>`<b>${esc(TIPOS[ausente(p.id,date).tipo])}:</b> ${esc(p.name)}`).join("<br>")}</div>`:""}
@@ -596,6 +604,7 @@ function viewCalendario(){
   }).join("");
   return `<section style="display:grid;gap:12px">
     <div class="bar">${filt}<div class="group">${S.config.locations.map((l,i)=>`<button ${i?"":`class="primary"`} data-calimg="${l.id}">Imagen ${esc(l.name)}</button><button data-calcopy="${l.id}">Copiar ${esc(l.name)}</button>`).join("")}<button id="xlsx">Descargar Excel</button></div></div>
+    <div class="alegend"><span style="--area:${AREA_COL.cocina}">Cocina</span><span style="--area:${AREA_COL.salon}">Salón</span><span style="--area:${AREA_COL.produccion}">Producción</span></div>
     <p class="hint" data-editonly>Tocá un turno para editarlo. Cada locación tiene su propia imagen en una hoja A4 horizontal; el Excel sale con el filtro elegido.</p>
     <div class="calwrap"><div class="cal">${days}</div></div>
     ${list.length?"":`<p class="hint">Esta semana todavía no tiene turnos. Cargalos en <b>Planificar semana</b>.</p>`}
@@ -1287,11 +1296,12 @@ function buildCalCanvas(only){
         y+=3;ops.splice(ops.length-0,0);ops.unshift({k:"r",x:3,y:y0,w:colW-6,h:y-y0,col:"#FFF0CF",bar:AMB});y+=4}
       const here=list.filter(a=>a.loc===L.id&&a.d===d&&a.t===t).sort((a,b)=>(a.in||"").localeCompare(b.in||"")||pname(a.s).localeCompare(pname(b.s)));
       for(const a of here){const y0=y;y+=3;
-        g.font=F(800,13);txt(F(800,13),fit(g,pname(a.s),inner),INK);y+=LH(13);
-        txt(M(700,11.5),`${a.in} a ${a.out||cierre(a.loc,a.d,a.t)}`,INK);y+=LH(11.5);
-        g.font=F(500,9.5);txt(F(500,9.5),fit(g,puesto(a.loc,a.p)?.name||"",inner),MUTED);y+=LH(9.5);
-        if(a.note){g.font=F(600,9.5);wrap(g,a.note,inner).forEach(z=>{txt(F(600,9.5),z,AMB);y+=LH(9.5)})}
-        y+=2;ops.unshift({k:"r",x:3,y:y0,w:colW-6,h:y-y0,col:"rgba(255,255,255,.6)"});y+=3}
+        const ac=areaCol(a.loc,a.p);
+        g.font=F(800,13);txt(F(800,13),fit(g,pname(a.s),inner-4),INK,9);y+=LH(13);
+        txt(M(700,11.5),`${a.in} a ${a.out||cierre(a.loc,a.d,a.t)}`,INK,9);y+=LH(11.5);
+        g.font=F(700,9.5);txt(F(700,9.5),fit(g,puesto(a.loc,a.p)?.name||"",inner-4),ac,9);y+=LH(9.5);
+        if(a.note){g.font=F(600,9.5);wrap(g,a.note,inner-4).forEach(z=>{txt(F(600,9.5),z,AMB,9);y+=LH(9.5)})}
+        y+=2;ops.unshift({k:"r",x:3,y:y0,w:colW-6,h:y-y0,col:"rgba(255,255,255,.7)",bar:ac,bw:4});y+=3}
       if(!here.length){txt(F(500,10),"—",MUTED);y+=LH(10)}
       cells[t+d]=ops;rowH[t]=Math.max(rowH[t],y+4)}
     return {cells,rowH,tot:rowH.a+rowH.c}}
@@ -1301,6 +1311,10 @@ function buildCalCanvas(only){
   g.fillStyle="#FFFFFF";g.fillRect(0,0,W,H);g.textBaseline="top";g.textAlign="left";
   g.fillStyle=INK;g.font="800 26px 'Bricolage Grotesque', system-ui, sans-serif";g.fillText(L.name.toUpperCase(),pad,14);
   const tw=g.measureText(L.name.toUpperCase()).width;g.font=FONT(600,15);g.fillStyle=MUTED;g.fillText(`Semana del ${fmtDM(w)} al ${fmtDM(addDays(w,6))}`,pad+tw+16,22);
+  {const areas=[...new Set(L.puestos.map(p=>areaKey(L.id,p.id)))].filter(a=>AREA_COL[a]);const NAMES={cocina:"Cocina",salon:"Salón",produccion:"Producción"};
+    let lx=W-pad;g.font=FONT(700,13);g.textAlign="right";
+    for(const a of areas.reverse()){g.fillStyle=INK;g.fillText(NAMES[a],lx,22);const tw2=g.measureText(NAMES[a]).width;g.fillStyle=AREA_COL[a];g.fillRect(lx-tw2-18,22,12,13);lx-=tw2+34}
+    g.textAlign="left"}
   const x0=pad+labW,y0=topH;
   for(let d=0;d<7;d++){const x=x0+d*colW;g.fillStyle=INK;g.fillRect(x+1,y0,colW-2,dayH-2);g.fillStyle="#FFFFFF";g.textAlign="center";
     g.font=FONT(800,13);g.fillText(DAYS[d].toUpperCase(),x+colW/2,y0+4);
@@ -1311,7 +1325,7 @@ function buildCalCanvas(only){
     g.textBaseline="top";
     for(let d=0;d<7;d++){const x=x0+d*colW;g.fillStyle=BG[t];g.fillRect(x+1,y+1,colW-2,rowH[t]-2);
       for(const o of Lo.cells[t+d]){
-        if(o.k==="r"){g.fillStyle=o.col;g.fillRect(x+o.x,y+o.y,o.w,o.h);if(o.bar){g.fillStyle=o.bar;g.fillRect(x+o.x,y+o.y,3,o.h)}}
+        if(o.k==="r"){g.fillStyle=o.col;g.fillRect(x+o.x,y+o.y,o.w,o.h);if(o.bar){g.fillStyle=o.bar;g.fillRect(x+o.x,y+o.y,o.bw||3,o.h)}}
         else if(o.s){g.font=o.f;g.fillStyle=o.col;g.textAlign=o.al;g.fillText(o.s,x+o.x,y+o.y);g.textAlign="left"}}}
     y+=rowH[t]}
   return cv;
