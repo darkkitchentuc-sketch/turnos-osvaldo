@@ -1,6 +1,7 @@
--- Turnos Osvaldo: PIN para que la caja actualice la carta online sin usuario.
+-- Turnos Osvaldo: link de edición para que la caja actualice la carta online sin usuario.
 -- Pegar completo en Supabase → SQL Editor → New query → Run. Se puede correr más de una vez.
--- Después, el administrador elige el PIN desde la carta (link + #editar → ingresar con email → "PIN de la caja").
+-- Después, el administrador crea el link desde la carta (link + #editar → ingresar con email → "Link de edición para la caja").
+-- La clave del link (#editar=12345678) se guarda cifrada acá, como un PIN.
 
 create extension if not exists pgcrypto with schema extensions;
 

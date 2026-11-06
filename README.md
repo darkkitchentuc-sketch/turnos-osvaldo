@@ -37,5 +37,5 @@ Correr `supabase/niveles.sql`. Personal (sin usuario): Calendario, Mi horario, C
 ## Carta online
 - Link para mandar a los clientes: `https://darkkitchentuc-sketch.github.io/turnos-osvaldo/carta/`
 - Para actualizar precios y "No disponible": el mismo link con `#editar` al final, ingresando con un usuario **administrador**. Se guarda en Supabase (`docs`, path `carta/osvaldo`); no hace falta correr SQL.
-- **PIN de la caja:** correr una vez `supabase/carta.sql` en Supabase → SQL Editor. Después el administrador entra con su email a `#editar` y crea el PIN en "PIN de la caja". Con ese PIN se puede cambiar precios y disponibilidad sin usuario (5 errores seguidos bloquean 15 minutos).
+- **Link de edición para la caja:** correr una vez `supabase/carta.sql` en Supabase → SQL Editor. Después el administrador entra con su email a `#editar` y toca "Crear link de edición". Ese link (`…/carta/#editar=12345678`) entra directo al panel sin email ni PIN; crear uno nuevo anula el anterior.
 - Los platos y sus textos están en `carta/index.html` (lista `CARTA`). Cada plato tiene un id fijo donde se guardan su precio y disponibilidad.
