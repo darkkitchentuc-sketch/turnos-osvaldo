@@ -91,7 +91,6 @@ body.editar .panel{display:block}
 .btn:disabled{opacity:.55;cursor:default}
 .err{color:var(--rojo);font-size:13px}
 .panel label.chk{display:flex;align-items:center;gap:8px;font-size:14px}
-.panel #lPin{font:inherit;font-size:22px;letter-spacing:.3em;padding:10px 12px;border:1px solid #cdd3da;border-radius:8px;max-width:200px}
 .link{font:inherit;font-size:13px;background:none;border:0;color:var(--azul);text-decoration:underline;cursor:pointer;padding:0}
 .barra{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 18px}
 .grupo{margin-top:22px}
@@ -213,11 +212,9 @@ function renderPanel(estado){
   const P=$("panel");
   if(estado==="sinbase"){P.innerHTML=`<h1>Actualizar carta</h1><p class="sub">No está configurada la base de datos (config.js).</p>`;return}
   if(estado==="login"){
-    P.innerHTML=`<h1>Actualizar carta</h1><p class="sub">Ingresá el PIN de la caja.</p>
-    <form id="loginPin"><label>PIN<input type="password" id="lPin" inputmode="numeric" autocomplete="off" maxlength="8" required></label>
-    <label class="chk"><input type="checkbox" id="lRec" checked> Recordar en este celular</label><p class="err" id="lErr"></p><button class="btn" id="lBtn">Entrar</button></form>
+    P.innerHTML=`<h1>Actualizar carta</h1>${renderPanel.err?`<p class="err" style="margin-top:8px">${esc(renderPanel.err)}</p>`:""}<p class="sub" style="margin-top:8px">Para actualizar la carta abrí el <b>link de edición</b> que te pasó el administrador.</p>
     <p style="margin-top:26px"><button class="link" onclick="renderPanel('login-email')">Soy administrador: ingresar con email</button></p>`;
-    setTimeout(()=>$("lPin")?.focus(),50);return}
+    renderPanel.err="";return}
   if(estado==="login-email"||estado==="sinpermiso"){
     P.innerHTML=`<h1>Actualizar carta</h1><p class="sub">Ingresá con el mismo usuario de administrador que usás en la app de turnos.</p>
     ${estado==="sinpermiso"?`<p class="err">Este usuario no es administrador, así que no puede cambiar la carta.</p><p style="margin-top:10px"><button class="btn sec2" onclick="salir()">Salir</button></p>`:
@@ -231,8 +228,9 @@ function renderPanel(estado){
    ${CARTA.map(s=>`<div class="grupo"><h3>${esc(s.titulo)}</h3>${s.general?(()=>{const g=it[s.general]||{};return `<div class="fila gen" data-id="${s.general}"><div class="n"><b>Precio por unidad</b> (vale para todos los gustos)</div><div class="pr"><span>$</span><input inputmode="numeric" data-k="precio" placeholder="Precio" value="${esc(g.precio?Number(soloNum(g.precio)).toLocaleString("es-AR"):"")}" aria-label="Precio por unidad de ${esc(s.titulo)}"></div></div>`})():""}${s.platos.map(([id,nom])=>{const d=it[id]||{};
      const inp=(k,lab)=>{const v=d[k]?Number(soloNum(d[k])).toLocaleString("es-AR"):"";const box=`<div class="pr"><span>$</span><input inputmode="numeric" data-k="${k}" placeholder="Precio" value="${esc(v)}" aria-label="Precio ${esc(lab||"")} de ${esc(nom)}"></div>`;return lab?`<label class="lab">${esc(lab)}${box}</label>`:box};
      return `<div class="fila${s.cols?" dos":""}${s.general?" solo":""}${d.nd?" off":""}" data-id="${id}"><div class="n">${esc(nom)}</div>${s.cols?inp("precio",s.cols[0])+inp("precio2",s.cols[1]):s.general?"<div></div>":inp("precio")}<button class="tg" type="button">${d.nd?"✕ No disponible":"✓ Disponible"}</button></div>`}).join("")}</div>`).join("")}
-   ${acceso==="admin"?`<div class="grupo pinbox"><h3>PIN de la caja</h3><p class="sub" style="margin:8px 0 10px">Con este PIN la cajera entra a esta pantalla sin email. Puede cambiar precios y disponibilidad, nada más. Si lo cambiás, el anterior deja de funcionar.</p>
-     <div class="barra"><div class="pr" style="width:150px"><input id="nuevoPin" type="password" inputmode="numeric" maxlength="8" placeholder="4 a 8 números" aria-label="Nuevo PIN"></div><button class="btn" onclick="cambiarPin()">Guardar PIN</button></div></div>`:""}
+   ${acceso==="admin"?`<div class="grupo pinbox"><h3>Link de edición para la caja</h3><p class="sub" style="margin:8px 0 10px">Quien tenga este link entra directo a esta pantalla, sin email ni PIN, y puede cambiar precios y disponibilidad (nada más). No lo mandes a clientes. Si creás uno nuevo, el anterior deja de funcionar.</p>
+     ${ultimoLink()?`<p class="sub" style="word-break:break-all;margin:0 0 10px"><b>Último link creado en este dispositivo:</b><br>${esc(ultimoLink())}</p>`:""}
+     <div class="barra">${ultimoLink()?`<button class="btn sec2" onclick="copiarEdicion()">Copiar link de edición</button>`:""}<button class="btn" onclick="crearLinkEdicion()">${ultimoLink()?"Crear link nuevo":"Crear link de edición"}</button></div></div>`:""}
    <div class="pie"><div class="in"><div class="est" id="est"></div><button class="btn" id="guardar" onclick="guardar()">Guardar</button></div></div>`;
   marcar(sucio);
 }
@@ -252,35 +250,35 @@ async function guardar(){
   if(acceso==="admin")({error}=await db.from("docs").upsert({path:DOC,data:nuevo,updated_at:nuevo.actualizado}));
   else{const r=await db.rpc("carta_guardar",{p_pin:pinActual,p_data:nuevo});error=r.error;
     if(!error&&r.data!=="ok"){b.disabled=false;b.textContent="Guardar";
-      if(r.data==="mal"||r.data==="sinpin"){olvidarPin();toast("El PIN cambió. Ingresá el nuevo y volvé a guardar.");pedirPinOtraVez();return}
-      toast(r.data==="bloqueado"?"Demasiados intentos con PIN equivocado. Probá en 15 minutos.":"No se pudo guardar.");return}}
+      if(r.data==="mal"||r.data==="sinpin"){olvidarPin();acceso=null;sucio=false;renderPanel.err="Este link de edición ya no funciona porque el administrador creó uno nuevo. Pedile el link nuevo.";renderPanel("login");return}
+      toast(r.data==="bloqueado"?"Demasiados intentos con links equivocados. Probá en 15 minutos.":"No se pudo guardar.");return}}
   b.disabled=false;b.textContent="Guardar";
   if(error){toast("No se pudo guardar: "+error.message);return}
   datos=nuevo;marcar(false);renderCarta();toast("Listo, la carta ya está actualizada")}
 function linkCarta(){return location.href.split("#")[0]}
 async function copiar(){const l=linkCarta();try{await navigator.clipboard.writeText(l);toast("Link copiado")}catch{prompt("Copiá este link:",l)}}
 async function salir(){if(acceso==="pin"){olvidarPin();acceso=null;sucio=false;location.hash=""}else{await db.auth.signOut();location.hash=""}}
-/* ===== PIN de la caja ===== */
+/* ===== Link de edición (la clave va en el link: #editar=12345678) ===== */
 let acceso=null,pinActual="";
+function claveLink(){const m=location.hash.match(/^#editar=(\d{4,8})$/);return m?m[1]:""}
 function olvidarPin(){pinActual="";try{localStorage.removeItem("cartaPin")}catch{}}
-function pedirPinOtraVez(){const pend=borrador;acceso=null;renderPanel("login");pedirPinOtraVez.borrador=pend}
-async function entrarConPin(pin,recordar){
+function ultimoLink(){try{return localStorage.getItem("cartaLinkEdicion")||""}catch{return""}}
+async function entrarConPin(pin){
   const {data,error}=await db.rpc("carta_entrar",{p_pin:pin});
-  if(error)return error.message.includes("carta_entrar")?"Falta activar el PIN en la base de datos (supabase/carta.sql).":"Sin conexión. Probá de nuevo.";
-  if(data==="ok"){pinActual=pin;acceso="pin";if(recordar){try{localStorage.setItem("cartaPin",pin)}catch{}}
-    await cargar();borrador=pedirPinOtraVez.borrador||structuredClone(datos);sucio=!!pedirPinOtraVez.borrador;pedirPinOtraVez.borrador=null;borrador.items??={};renderPanel("ok");return""}
+  if(error)return error.message.includes("carta_entrar")?"Falta activar el link de edición en la base de datos (supabase/carta.sql).":"Sin conexión. Probá de nuevo.";
+  if(data==="ok"){pinActual=pin;acceso="pin";try{localStorage.setItem("cartaPin",pin)}catch{}
+    await cargar();borrador=structuredClone(datos);borrador.items??={};sucio=false;renderPanel("ok");return""}
   olvidarPin();
-  return data==="bloqueado"?"Demasiados intentos. Probá de nuevo en 15 minutos.":data==="sinpin"?"Todavía no hay PIN. El administrador lo crea entrando con su email.":"El PIN no es correcto."}
-async function cambiarPin(){const v=$("nuevoPin").value.trim();
-  if(!/^\d{4,8}$/.test(v)){toast("El PIN tiene que tener de 4 a 8 números.");return}
+  return data==="bloqueado"?"Demasiados intentos. Probá de nuevo en 15 minutos.":data==="sinpin"?"Todavía no hay link de edición. El administrador lo crea entrando con su email.":"Este link de edición ya no funciona. Pedile el link nuevo al administrador."}
+async function crearLinkEdicion(){
+  if(ultimoLink()&&!confirm("Si creás un link nuevo, el anterior deja de funcionar. ¿Seguro?"))return;
+  const n=new Uint32Array(1);crypto.getRandomValues(n);const v=String(n[0]%90000000+10000000);
   const {data,error}=await db.rpc("carta_cambiar_pin",{p_pin:v});
-  if(error){toast(error.message.includes("carta_cambiar_pin")?"Primero hay que correr supabase/carta.sql en Supabase.":"No se pudo guardar el PIN: "+error.message);return}
-  if(data!=="ok"){toast("El PIN tiene que tener de 4 a 8 números.");return}
-  $("nuevoPin").value="";toast("PIN guardado. Pasáselo a la cajera.")}
-document.addEventListener("submit",async e=>{if(e.target.id!=="loginPin")return;e.preventDefault();
-  const pin=$("lPin").value.trim();$("lBtn").disabled=true;$("lErr").textContent="";
-  const err=await entrarConPin(pin,$("lRec").checked);
-  if(err){$("lBtn").disabled=false;$("lErr").textContent=err;$("lPin").select()}});
+  if(error){toast(error.message.includes("carta_cambiar_pin")?"Primero hay que correr supabase/carta.sql en Supabase.":"No se pudo crear el link: "+error.message);return}
+  if(data!=="ok"){toast("No se pudo crear el link.");return}
+  const l=linkCarta()+"#editar="+v;try{localStorage.setItem("cartaLinkEdicion",l)}catch{}
+  renderPanel("ok");copiarEdicion()}
+async function copiarEdicion(){const l=ultimoLink();try{await navigator.clipboard.writeText(l);toast("Link de edición copiado. Pasáselo a la cajera.")}catch{prompt("Copiá este link:",l)}}
 window.addEventListener("beforeunload",e=>{if(sucio&&document.body.classList.contains("editar")){e.preventDefault();e.returnValue=""}});
 document.addEventListener("submit",async e=>{if(e.target.id!=="login")return;e.preventDefault();
   $("lBtn").disabled=true;$("lErr").textContent="";
@@ -290,8 +288,8 @@ document.addEventListener("submit",async e=>{if(e.target.id!=="login")return;e.p
 async function sesion(s){
   if(!document.body.classList.contains("editar"))return;
   if(!s){if(acceso==="pin")return;acceso=null;
-    let guardado="";try{guardado=localStorage.getItem("cartaPin")||""}catch{}
-    if(guardado&&!(await entrarConPin(guardado,true)))return;
+    let clave=claveLink();if(!clave){try{clave=localStorage.getItem("cartaPin")||""}catch{}}
+    if(clave){const err=await entrarConPin(clave);if(!err)return;renderPanel.err=err}
     renderPanel("login");return}
   const {data}=await db.from("editores").select("rol").eq("email",(s.user.email||"").toLowerCase()).maybeSingle();
   if(!data||(data.rol&&data.rol!=="admin")){renderPanel("sinpermiso");return}
@@ -302,7 +300,7 @@ async function cargar(){if(!db)return;
   if(!error&&data?.data)datos=data.data;datos.items??={}}
 document.addEventListener("click",e=>{const a=e.target.closest("#menu a");if(!a)return;e.preventDefault();
   document.getElementById(a.getAttribute("href").slice(1))?.scrollIntoView({behavior:"smooth"})});
-function modo(){const ed=location.hash==="#editar";if(modo.ed===ed)return;modo.ed=ed;document.body.classList.toggle("editar",ed);
+function modo(){const ed=location.hash.startsWith("#editar");if(modo.ed===ed)return;modo.ed=ed;document.body.classList.toggle("editar",ed);
   if(ed){if(!db)renderPanel("sinbase");else db.auth.getSession().then(({data})=>sesion(data.session))}
   else{cargar().then(renderCarta)}}
 
