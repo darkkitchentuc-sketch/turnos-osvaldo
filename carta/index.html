@@ -57,6 +57,7 @@ img{display:block;max-width:100%}
 .lista.chica .precio{font-size:12px;padding-top:2px}
 .cab{display:flex;align-items:flex-end;gap:12px}
 .cab h2{flex:1}
+.cab .gral{font-size:14px;padding-bottom:3px}.cab .gral small{font-size:10px;font-weight:500;letter-spacing:.12em}
 .colhead,.precios{flex:none;display:flex;gap:6px}
 .colhead span{width:66px;text-align:right;font-size:10.5px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--azul);padding-bottom:3px}
 .precios .precio{width:66px;text-align:right;font-size:12.5px}
@@ -90,6 +91,7 @@ body.editar .panel{display:block}
 .fila{display:grid;grid-template-columns:1fr 112px auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid #eef0f2}
 .fila .n{font-size:13.5px;line-height:1.3}
 .fila.dos{grid-template-columns:1fr 100px 100px auto}
+.fila.gen{grid-template-columns:1fr 140px;background:#f6f8fc;padding:10px 8px;border-radius:8px;border-bottom:0;margin-top:8px}
 .fila .lab{display:grid;gap:3px;font-size:11px;font-weight:600;color:#5b6472;letter-spacing:.06em}
 .fila.off .n{color:#9aa1ab;text-decoration:line-through}
 .pr{display:flex;align-items:center;border:1px solid #cdd3da;border-radius:8px;padding:0 8px;background:#fff}
@@ -102,7 +104,7 @@ body.editar .panel{display:block}
 .pie .in{max-width:608px;margin:0 auto;display:flex;align-items:center;gap:12px}
 .pie .est{flex:1;font-size:13px;color:#5b6472}
 .pie .est.mod{color:#b25b00;font-weight:600}
-@media (max-width:480px){.fila{grid-template-columns:1fr auto;row-gap:8px}.fila .n{grid-column:1 / -1}.fila .pr{width:150px}.fila.dos{grid-template-columns:1fr 1fr}.fila.dos .pr{width:auto}.fila.dos .tg{grid-column:1 / -1;justify-self:start}}
+@media (max-width:480px){.fila{grid-template-columns:1fr auto;row-gap:8px}.fila .n{grid-column:1 / -1}.fila .pr{width:150px}.fila.dos{grid-template-columns:1fr 1fr}.fila.dos .pr{width:auto}.fila.dos .tg{grid-column:1 / -1;justify-self:start}.fila.solo .n{grid-column:auto}.fila.solo>div:empty{display:none}}
 .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#1d2430;color:#fff;font-size:14px;padding:10px 16px;border-radius:8px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
 .toast.on{opacity:1}
 </style>
@@ -123,7 +125,7 @@ const CARTA=[
   ["bom-jyq","Jamón y queso","Doradas, crujientes y con un centro de queso cremoso y jamón cocido"],
   ["bom-4q","4 quesos","Doradas, crujientes y con un centro de la mezcla perfecta de quesos (azul, cremoso, parmesano y holando)"],
   ["bom-sg","Queso y sin gluten","Doradas, crujientes y con un centro de queso cremoso, sin gluten"]]},
- {hoja:1,id:"empanadas",titulo:"Empanadas fritas",cols:["x1","x4"],bajada:"También podes pedirlas al horno",platos:[
+ {hoja:1,id:"empanadas",titulo:"Empanadas fritas",general:"emp-general",bajada:"También podes pedirlas al horno",platos:[
   ["emp-picante","Carne picante"],["emp-carne","Carne"],["emp-pollo","Pollo"],["emp-jyq","JyQ"],["emp-humita","Humita"],
   ["emp-ternera","Ternera y queso",null,1],["emp-osobuco","Osobuco al Malbec"]]},
  {hoja:2,id:"milanesas",titulo:"Milanesas",tipo:"desc",cols:["P/1","P/2"],bajada:"Donde come 1,comen 2 y donde comen 2 comen 3.<br>También viene con papita o ensalada.",platos:[
@@ -155,7 +157,7 @@ const DOC="carta/osvaldo";
 const INICIALES={
  "bom-carne":{precio:"3900",precio2:"13000"},"bom-queso":{precio:"3900",precio2:"13000"},"bom-jyq":{precio:"3900",precio2:"13000"},
  "bom-4q":{precio:"3900",precio2:"13000"},"bom-sg":{precio:"4100",precio2:"13000"},
- "emp-picante":{precio:"2300"},"emp-carne":{precio:"2300"},"emp-pollo":{precio:"2300"},"emp-jyq":{precio:"2300"},"emp-humita":{precio:"2300"},"emp-ternera":{precio:"2300"},"emp-osobuco":{precio:"2300"},
+ "emp-general":{precio:"2300"},
  "mila-trad":{precio:"18000",precio2:"28500"},"mila-bodegon":{precio:"27000",precio2:"39000"},"mila-napo":{precio:"24000",precio2:"37000"},"mila-4q":{precio:"29900",precio2:"43000"},
  "sup-trad":{precio:"15000",precio2:"25500"},"sup-bodegon":{precio:"23000",precio2:"35000"},"sup-napo":{precio:"21000",precio2:"33000"},"sup-4q":{precio:"26000",precio2:"37000"},
  "otr-papas":{precio:"8000"},"otr-humita":{precio:"14000"},"otr-lentejas":{precio:"14000"},"otr-tamales":{precio:"12000"},"otr-locro":{precio:"14000"},
@@ -176,9 +178,9 @@ function fechaAct(){if(!datos.actualizado)return"";const d=new Date(datos.actual
 function renderCarta(){
   const it=datos.items||{};
   const plato=([id,nom,des,est],s)=>{const d=it[id]||{};const nd=!!d.nd;const p=fmt(d.precio);
-    const precio=nd?'<span class="nd">No disponible</span>':s.cols?`<div class="precios"><span class="precio">${p}</span><span class="precio">${fmt(d.precio2)}</span></div>`:p?`<span class="precio">${p}</span>`:"";
+    const precio=nd?'<span class="nd">No disponible</span>':s.general?"":s.cols?`<div class="precios"><span class="precio">${p}</span><span class="precio">${fmt(d.precio2)}</span></div>`:p?`<span class="precio">${p}</span>`:"";
     return `<div class="plato${nd?" agotado":""}"><div class="info"><div class="nom">${esc(nom)}${est?ESTRELLA:""}</div>${des?`<div class="des">${esc(des)}</div>`:""}</div>${precio}</div>`};
-  const sec=s=>`<section class="sec" id="${s.id}"><div class="cab"><h2>${esc(s.titulo)}</h2>${s.cols?`<div class="colhead">${s.cols.map(c=>`<span>${esc(c)}</span>`).join("")}</div>`:""}</div>${s.bajada?`<p class="bajada">${s.bajada}</p>`:""}<div class="lista ${s.tipo||""}">${s.platos.map(p=>plato(p,s)).join("")}</div></section>`;
+  const sec=s=>`<section class="sec" id="${s.id}"><div class="cab"><h2>${esc(s.titulo)}</h2>${s.general&&fmt(it[s.general]?.precio)?`<span class="precio gral">${fmt(it[s.general].precio)} <small>c/u</small></span>`:""}${s.cols?`<div class="colhead">${s.cols.map(c=>`<span>${esc(c)}</span>`).join("")}</div>`:""}</div>${s.bajada?`<p class="bajada">${s.bajada}</p>`:""}<div class="lista ${s.tipo||""}">${s.platos.map(p=>plato(p,s)).join("")}</div></section>`;
   const cita=`<div class="cita"><p>¿Qué significan las empanadas para Osvaldito?</p><p>Las empanadas son la insignia de Osvaldito. Es el producto que hace mi mamá desde que tengo memoria y, hoy, siguen siendo igual de ricas.</p><img src="img/empanada.png" alt=""></div>`;
   const f=fechaAct();
   $("carta").innerHTML=
@@ -211,14 +213,14 @@ function renderPanel(estado){
   P.innerHTML=`<h1>Actualizar carta</h1>
    <p class="sub">Cargá el precio de cada plato y tocá el botón para marcarlo <b>No disponible</b>. Después tocá <b>Guardar</b>: el link se actualiza al instante.</p>
    <div class="barra"><a class="btn sec2" href="./" target="_blank">Ver carta</a><button class="btn sec2" onclick="copiar()">Copiar link para mandar</button><button class="btn sec2" onclick="todoDisp()">Poner todo disponible</button><button class="btn sec2" onclick="salir()">Salir</button></div>
-   ${CARTA.map(s=>`<div class="grupo"><h3>${esc(s.titulo)}</h3>${s.platos.map(([id,nom])=>{const d=it[id]||{};
+   ${CARTA.map(s=>`<div class="grupo"><h3>${esc(s.titulo)}</h3>${s.general?(()=>{const g=it[s.general]||{};return `<div class="fila gen" data-id="${s.general}"><div class="n"><b>Precio por unidad</b> (vale para todos los gustos)</div><div class="pr"><span>$</span><input inputmode="numeric" data-k="precio" placeholder="Precio" value="${esc(g.precio?Number(soloNum(g.precio)).toLocaleString("es-AR"):"")}" aria-label="Precio por unidad de ${esc(s.titulo)}"></div></div>`})():""}${s.platos.map(([id,nom])=>{const d=it[id]||{};
      const inp=(k,lab)=>{const v=d[k]?Number(soloNum(d[k])).toLocaleString("es-AR"):"";const box=`<div class="pr"><span>$</span><input inputmode="numeric" data-k="${k}" placeholder="Precio" value="${esc(v)}" aria-label="Precio ${esc(lab||"")} de ${esc(nom)}"></div>`;return lab?`<label class="lab">${esc(lab)}${box}</label>`:box};
-     return `<div class="fila${s.cols?" dos":""}${d.nd?" off":""}" data-id="${id}"><div class="n">${esc(nom)}</div>${s.cols?inp("precio",s.cols[0])+inp("precio2",s.cols[1]):inp("precio")}<button class="tg" type="button">${d.nd?"✕ No disponible":"✓ Disponible"}</button></div>`}).join("")}</div>`).join("")}
+     return `<div class="fila${s.cols?" dos":""}${s.general?" solo":""}${d.nd?" off":""}" data-id="${id}"><div class="n">${esc(nom)}</div>${s.cols?inp("precio",s.cols[0])+inp("precio2",s.cols[1]):s.general?"<div></div>":inp("precio")}<button class="tg" type="button">${d.nd?"✕ No disponible":"✓ Disponible"}</button></div>`}).join("")}</div>`).join("")}
    <div class="pie"><div class="in"><div class="est" id="est"></div><button class="btn" id="guardar" onclick="guardar()">Guardar</button></div></div>`;
   marcar(sucio);
 }
 function marcar(v){sucio=v;const e=$("est");if(!e)return;
-  e.className="est"+(v?" mod":"");e.textContent=v?"Hay cambios sin guardar":(datos.actualizado?"Guardado · "+fechaAct()+" "+new Date(datos.actualizado).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"}):"Sin cambios")}
+  e.className="est"+(v?" mod":"");e.textContent=v?"Hay cambios sin guardar":(datos.actualizado?"Guardado · "+fechaAct()+" "+new Date(datos.actualizado).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"}):"Todavía no guardaste la carta")}
 document.addEventListener("input",e=>{const f=e.target.closest(".fila");if(!f)return;
   const id=f.dataset.id,n=soloNum(e.target.value);(borrador.items[id]??={})[e.target.dataset.k||"precio"]=n;
   const pos=e.target.value.length-e.target.selectionStart;e.target.value=n?Number(n).toLocaleString("es-AR"):"";const c=Math.max(0,e.target.value.length-pos);e.target.setSelectionRange(c,c);marcar(true)});
