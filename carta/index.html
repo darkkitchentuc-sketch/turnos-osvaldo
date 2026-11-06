@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Carta · Osvaldo</title>
+<meta name="description" content="Carta de Osvaldo, el bodegón de Barrio Norte. Precios y disponibilidad del día.">
+<meta property="og:title" content="Carta de Osvaldo">
+<meta property="og:description" content="El bodegón de Barrio Norte. Precios y disponibilidad del día.">
+<meta property="og:image" content="https://darkkitchentuc-sketch.github.io/turnos-osvaldo/carta/img/portada.jpg">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#004AAD">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Arimo:wght@700&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.90.0/dist/umd/supabase.js"></script>
+<script src="../config.js"></script>
+<style>
+:root{
+  --azul:#004AAD; --rojo:#D03E31; --papel:#F5F7F5; --fondo:#E4E7E4;
+  --tit:"Arimo","Helvetica Neue",Helvetica,Arial,sans-serif;
+  --txt:"Montserrat",system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--fondo);color:var(--azul);font-family:var(--txt);min-height:100vh}
+img{display:block;max-width:100%}
+.carta{max-width:600px;margin:0 auto;background:var(--papel);box-shadow:0 0 0 1px rgba(0,0,0,.04),0 2px 18px rgba(0,0,0,.07);min-height:100vh}
+.hoja{padding:40px 34px 48px}
+@media (max-width:640px){.hoja{padding:34px 22px 40px}}
+
+/* portada */
+.portada{background:var(--azul);min-height:min(78vh,640px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 24px;position:relative}
+.portada img{width:min(62%,330px)}
+.portada .act{position:absolute;bottom:22px;left:0;right:0;text-align:center;color:#fff;opacity:.85;font-size:10px;letter-spacing:.24em;text-transform:uppercase}
+
+/* menú de secciones (fijo arriba al scrollear) */
+.menu{position:sticky;top:0;z-index:5;display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;background:rgba(245,247,245,.96);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-bottom:1px solid #e3e7e3;padding:10px 16px}
+.menu::-webkit-scrollbar{display:none}
+.menu a{flex:none;color:var(--azul);text-decoration:none;font-size:10px;font-weight:500;letter-spacing:.18em;text-transform:uppercase;padding:7px 10px;border-radius:999px;white-space:nowrap}
+.menu a.on{background:var(--rojo);color:#fff}
+
+/* secciones */
+.sec{margin-bottom:46px;scroll-margin-top:62px}
+.sec:last-child{margin-bottom:0}
+.sec h2{font-family:var(--tit);font-weight:700;color:var(--rojo);font-size:24px;letter-spacing:.06em;line-height:1.1;text-transform:uppercase}
+.sec .bajada{color:var(--rojo);font-size:9.5px;letter-spacing:.2em;line-height:1.6;text-transform:uppercase;margin-top:6px}
+.lista{margin-top:10px}
+.plato{display:flex;align-items:flex-start;gap:12px;padding:3px 0}
+.lista.desc .plato{padding:5px 0}
+.plato .info{flex:1;min-width:0}
+.plato .nom{font-size:14.5px;letter-spacing:.24em;line-height:1.35;text-transform:uppercase}
+.lista.chica .nom{font-size:12px;line-height:1.6}
+.plato .des{font-size:9.5px;letter-spacing:.17em;line-height:1.55;text-transform:uppercase;margin-top:2px;max-width:390px}
+.estrella{display:inline-block;width:.85em;height:.85em;vertical-align:-.05em;margin-left:.25em;fill:var(--rojo)}
+.precio{flex:none;font-size:13.5px;font-weight:600;letter-spacing:.06em;white-space:nowrap;padding-top:1px}
+.lista.chica .precio{font-size:12px;padding-top:2px}
+.nd{flex:none;align-self:flex-start;font-size:8.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--rojo);border:1.3px solid var(--rojo);border-radius:3px;padding:3px 6px 2px;white-space:nowrap;margin-top:1px}
+.plato.agotado .info{opacity:.42}
+
+.cita{text-align:center;margin:-6px auto 52px;max-width:420px}
+.cita p:first-child{color:var(--rojo);font-size:9.5px;letter-spacing:.2em;text-transform:uppercase}
+.cita p+p{font-size:9.5px;letter-spacing:.2em;line-height:1.75;text-transform:uppercase;margin-top:10px}
+.cita img{width:48px;margin:26px auto 0}
+.ilus{width:min(46%,210px);margin:56px 0 0 auto}
+
+/* panel de edición */
+.panel{display:none;max-width:640px;margin:0 auto;background:#fff;min-height:100vh;padding:20px 16px 110px;font-family:var(--txt);color:#1d2430}
+body.editar{background:#eef0ee}
+body.editar .carta{display:none}
+body.editar .panel{display:block}
+.panel h1{font-family:var(--tit);color:var(--azul);font-size:22px;letter-spacing:.04em}
+.panel .sub{font-size:13px;color:#5b6472;margin:4px 0 16px;line-height:1.45}
+.panel form{display:grid;gap:10px;max-width:340px;margin-top:10px}
+.panel label{font-size:13px;color:#5b6472;display:grid;gap:4px}
+.panel input[type=email],.panel input[type=password]{font:inherit;font-size:16px;padding:10px 12px;border:1px solid #cdd3da;border-radius:8px}
+.btn{font:inherit;font-size:14px;font-weight:600;border:0;border-radius:8px;padding:11px 16px;cursor:pointer;background:var(--azul);color:#fff;text-decoration:none;display:inline-block;text-align:center}
+.btn.sec2{background:#e8edf6;color:var(--azul)}
+.btn:disabled{opacity:.55;cursor:default}
+.err{color:var(--rojo);font-size:13px}
+.barra{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 18px}
+.grupo{margin-top:22px}
+.grupo h3{font-family:var(--tit);color:var(--rojo);font-size:15px;letter-spacing:.06em;text-transform:uppercase;padding-bottom:6px;border-bottom:2px solid #f0d6d3}
+.fila{display:grid;grid-template-columns:1fr 112px auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid #eef0f2}
+.fila .n{font-size:13.5px;line-height:1.3}
+.fila.off .n{color:#9aa1ab;text-decoration:line-through}
+.pr{display:flex;align-items:center;border:1px solid #cdd3da;border-radius:8px;padding:0 8px;background:#fff}
+.pr span{color:#8a93a0;font-size:15px}
+.pr input{font:inherit;font-size:16px;width:100%;border:0;outline:0;padding:8px 4px;background:transparent}
+.pr:focus-within{border-color:var(--azul);box-shadow:0 0 0 2px #cfe0f7}
+.tg{font:inherit;font-size:12px;font-weight:600;border-radius:999px;padding:8px 10px;cursor:pointer;border:1.5px solid #2e8b57;color:#2e8b57;background:#effaf3;white-space:nowrap;min-width:118px}
+.fila.off .tg{border-color:var(--rojo);color:var(--rojo);background:#fdf0ee}
+.pie{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.96);border-top:1px solid #e3e6ea;padding:12px 16px calc(12px + env(safe-area-inset-bottom))}
+.pie .in{max-width:608px;margin:0 auto;display:flex;align-items:center;gap:12px}
+.pie .est{flex:1;font-size:13px;color:#5b6472}
+.pie .est.mod{color:#b25b00;font-weight:600}
+@media (max-width:480px){.fila{grid-template-columns:1fr auto;row-gap:8px}.fila .n{grid-column:1 / -1}.fila .pr{width:150px}}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#1d2430;color:#fff;font-size:14px;padding:10px 16px;border-radius:8px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
+.toast.on{opacity:1}
+</style>
+</head>
+<body>
+
+<main class="carta" id="carta"></main>
+
+<section class="panel" id="panel"></section>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===== La carta (textos tal cual el PDF). Cada plato tiene un id fijo: no cambiarlo, ahí se guardan precio y disponibilidad. ===== */
+const CARTA=[
+ {hoja:1,id:"bombitas",titulo:"Bombitas",tipo:"desc",platos:[
+  ["bom-carne","Carne","Relleno de carne jugosa y sazonada al estilo casero"],
+  ["bom-queso","Queso","Doradas, crujientes y con un centro de queso cremoso"],
+  ["bom-jyq","Jamón y queso","Doradas, crujientes y con un centro de queso cremoso y jamón cocido"],
+  ["bom-4q","4 quesos","Doradas, crujientes y con un centro de la mezcla perfecta de quesos (azul, cremoso, parmesano y holando)"],
+  ["bom-sg","Queso y sin gluten","Doradas, crujientes y con un centro de queso cremoso, sin gluten"]]},
+ {hoja:1,id:"empanadas",titulo:"Empanadas fritas",bajada:"También podes pedirlas al horno",platos:[
+  ["emp-picante","Carne picante"],["emp-carne","Carne"],["emp-pollo","Pollo"],["emp-jyq","JyQ"],["emp-humita","Humita"],
+  ["emp-ternera","Ternera y queso",null,1],["emp-osobuco","Osobuco al Malbec"]]},
+ {hoja:2,id:"milanesas",titulo:"Milanesas",tipo:"desc",bajada:"Donde come 1,comen 2 y donde comen 2 comen 3.<br>También viene con papita o ensalada.",platos:[
+  ["mila-trad","Tradicional","La mila de toda la vida, frita al plato"],
+  ["mila-bodegon","De bodegón","Mila frita con su salsa de tomate casera, morrones en conserva artesanal, mozzarella y jamón cocido"],
+  ["mila-napo","Napolitana","Mila frita con su salsa de tomate casera, mozzarella y albahacas frescas"],
+  ["mila-4q","4 quesos","Mila frita con la mezcla perfecta de quesos (azul,mozzarella,parmesano y holando).",1]]},
+ {hoja:2,id:"supremas",titulo:"Supremas",tipo:"desc",bajada:"Donde come 1, comen 2 y donde comen 2, comen 3.<br>También viene con papitas o ensalada.",platos:[
+  ["sup-trad","Tradicional","La suprema de toda la vida, frita al plato"],
+  ["sup-bodegon","De bodegón","Suprema frita con su salsa de tomate casera, morrones en conserva artesanal, mozzarella y jamón cocido"],
+  ["sup-napo","Napolitana","Suprema frita con su salsa de tomate casera, mozzarella y albahacas frescas",1],
+  ["sup-4q","4 quesos","Mila frita con la mezcla perfecta de quesos (azul, mozzarella, parmesano y holando)"]]},
+ {hoja:2,id:"otros",titulo:"Otros platos",platos:[
+  ["otr-papas","Porción de papas"],["otr-humita","Humita casera"],["otr-lentejas","Guiso de lentejas"],["otr-tamales","Tamales"],["otr-locro","Locro"]]},
+ {hoja:2,id:"postres",titulo:"Postres",platos:[
+  ["pos-budin","Budín de pan con DDL"],["pos-flan","Flan con DDL"],["pos-chocotorta","Chocotorta"],["pos-vigilante","Vigilante"]]},
+ {hoja:3,id:"sinalcohol",titulo:"Sin alcohol",tipo:"chica",platos:[
+  ["sa-latas","Latas linea Pepsi"],["sa-mirinda","Mirinda manzana 500cc"],["sa-agua","Botella agua sin gas"],["sa-sifon","Sifoncito de soda",null,1]]},
+ {hoja:3,id:"cervezas",titulo:"Cervezas",tipo:"chica",platos:[
+  ["cer-stella-rubia","Stella Artois rubia 473cc"],["cer-stella-negra","Stella Artois negra 473cc"],["cer-stella-sin","Stella Artois sin alcohol 473cc"],
+  ["cer-walnuss","Artesanal Walnuss 473cc"],["cer-norte","Botella Norte 1L"],["cer-heineken","Heineken 473cc"],["cer-salta","Salta negra 473cc"]]},
+ {hoja:3,id:"vinos",titulo:"Vinos y aperitivos",tipo:"chica",platos:[
+  ["vin-sf-malbec","Saint Felicien Malbec Catena Zapata"],["vin-sf-cab","Saint Felicien Cab.Sauvig. Catena Zapata"],["vin-alamos-dulce","Alamos dulce natural"],
+  ["vin-alamos-malbec","Alamos Malbec"],["ape-fernet","Fernet + Coca Cola (vaso 500ml)"],["ape-amargo","Amargo Obrero + soda",null,1],
+  ["ape-carpano","Carpano + soda"],["vin-copa","Copa de vino"],["ape-gin","Gin tonic"]]}
+];
+const DOC="carta/osvaldo";
+const ESTRELLA='<svg class="estrella" viewBox="0 0 24 24" aria-label="recomendado"><path d="M12 2.5l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7L2 9.7l7.1-.6z"/></svg>';
+let datos={items:{}},db=null;
+
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const soloNum=v=>String(v??"").replace(/[^\d]/g,"");
+const fmt=v=>{const n=soloNum(v);return n?"$"+Number(n).toLocaleString("es-AR"):""};
+function toast(t){const e=$("toast");e.textContent=t;e.classList.add("on");clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove("on"),2200)}
+function fechaAct(){if(!datos.actualizado)return"";const d=new Date(datos.actualizado);
+  return d.toLocaleDateString("es-AR",{weekday:"long",day:"numeric",month:"numeric"})}
+
+/* ===== Carta pública ===== */
+function renderCarta(){
+  const it=datos.items||{};
+  const plato=([id,nom,des,est],tipo)=>{const d=it[id]||{};const nd=!!d.nd;const p=fmt(d.precio);
+    return `<div class="plato${nd?" agotado":""}"><div class="info"><div class="nom">${esc(nom)}${est?ESTRELLA:""}</div>${des?`<div class="des">${esc(des)}</div>`:""}</div>${nd?'<span class="nd">No disponible</span>':p?`<span class="precio">${p}</span>`:""}</div>`};
+  const sec=s=>`<section class="sec" id="${s.id}"><h2>${esc(s.titulo)}</h2>${s.bajada?`<p class="bajada">${s.bajada}</p>`:""}<div class="lista ${s.tipo||""}">${s.platos.map(p=>plato(p,s.tipo)).join("")}</div></section>`;
+  const cita=`<div class="cita"><p>¿Qué significan las empanadas para Osvaldito?</p><p>Las empanadas son la insignia de Osvaldito. Es el producto que hace mi mamá desde que tengo memoria y, hoy, siguen siendo igual de ricas.</p><img src="img/empanada.png" alt=""></div>`;
+  const f=fechaAct();
+  $("carta").innerHTML=
+    `<header class="portada"><img src="img/logo.png" alt="Osvaldo, el bodegón de Barrio Norte">${f?`<p class="act">Actualizado ${esc(f)}</p>`:""}</header>`+
+    `<nav class="menu" id="menu">${CARTA.map(s=>`<a href="#${s.id}">${esc(s.titulo)}</a>`).join("")}</nav>`+
+    `<div class="hoja">${CARTA.map(s=>sec(s)+(s.id==="empanadas"?cita:"")).join("")}<img class="ilus" src="img/ilustracion.jpg" alt="Ilustración de Osvaldo"></div>`;
+  activarMenu();
+}
+/* resalta en el menú la sección que se está viendo */
+function activarMenu(){
+  if(!("IntersectionObserver" in window))return;
+  activarMenu.o?.disconnect();
+  const links=[...document.querySelectorAll("#menu a")];
+  activarMenu.o=new IntersectionObserver(es=>{es.forEach(e=>{if(!e.isIntersecting)return;
+    links.forEach(a=>{const on=a.getAttribute("href")==="#"+e.target.id;a.classList.toggle("on",on);if(on)a.scrollIntoView({block:"nearest",inline:"center",behavior:"smooth"})})})},{rootMargin:"-45% 0px -50% 0px"});
+  CARTA.forEach(s=>{const el=document.getElementById(s.id);if(el)activarMenu.o.observe(el)});
+}
+
+/* ===== Panel para actualizar (link de la carta + #editar) ===== */
+let borrador=null,sucio=false;
+function renderPanel(estado){
+  const P=$("panel");
+  if(estado==="sinbase"){P.innerHTML=`<h1>Actualizar carta</h1><p class="sub">No está configurada la base de datos (config.js).</p>`;return}
+  if(estado==="login"||estado==="sinpermiso"){
+    P.innerHTML=`<h1>Actualizar carta</h1><p class="sub">Ingresá con el mismo usuario de administrador que usás en la app de turnos.</p>
+    ${estado==="sinpermiso"?`<p class="err">Este usuario no es administrador, así que no puede cambiar la carta.</p><p style="margin-top:10px"><button class="btn sec2" onclick="salir()">Salir</button></p>`:
+    `<form id="login"><label>Email<input type="email" id="lEmail" autocomplete="username" required></label><label>Contraseña<input type="password" id="lPass" autocomplete="current-password" required></label><p class="err" id="lErr"></p><button class="btn" id="lBtn">Ingresar</button></form>`}`;
+    return}
+  const it=borrador.items;
+  P.innerHTML=`<h1>Actualizar carta</h1>
+   <p class="sub">Cargá el precio de cada plato y tocá el botón para marcarlo <b>No disponible</b>. Después tocá <b>Guardar</b>: el link se actualiza al instante.</p>
+   <div class="barra"><a class="btn sec2" href="./" target="_blank">Ver carta</a><button class="btn sec2" onclick="copiar()">Copiar link para mandar</button><button class="btn sec2" onclick="todoDisp()">Poner todo disponible</button><button class="btn sec2" onclick="salir()">Salir</button></div>
+   ${CARTA.map(s=>`<div class="grupo"><h3>${esc(s.titulo)}</h3>${s.platos.map(([id,nom])=>{const d=it[id]||{};
+     return `<div class="fila${d.nd?" off":""}" data-id="${id}"><div class="n">${esc(nom)}</div><div class="pr"><span>$</span><input inputmode="numeric" placeholder="Precio" value="${esc(d.precio?Number(soloNum(d.precio)).toLocaleString("es-AR"):"")}" aria-label="Precio de ${esc(nom)}"></div><button class="tg" type="button">${d.nd?"✕ No disponible":"✓ Disponible"}</button></div>`}).join("")}</div>`).join("")}
+   <div class="pie"><div class="in"><div class="est" id="est"></div><button class="btn" id="guardar" onclick="guardar()">Guardar</button></div></div>`;
+  marcar(sucio);
+}
+function marcar(v){sucio=v;const e=$("est");if(!e)return;
+  e.className="est"+(v?" mod":"");e.textContent=v?"Hay cambios sin guardar":(datos.actualizado?"Guardado · "+fechaAct()+" "+new Date(datos.actualizado).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"}):"Sin cambios")}
+document.addEventListener("input",e=>{const f=e.target.closest(".fila");if(!f)return;
+  const id=f.dataset.id,n=soloNum(e.target.value);(borrador.items[id]??={}).precio=n;
+  const pos=e.target.value.length-e.target.selectionStart;e.target.value=n?Number(n).toLocaleString("es-AR"):"";const c=Math.max(0,e.target.value.length-pos);e.target.setSelectionRange(c,c);marcar(true)});
+document.addEventListener("click",e=>{const b=e.target.closest(".tg");if(!b)return;const f=b.closest(".fila"),id=f.dataset.id;
+  const d=(borrador.items[id]??={});d.nd=!d.nd;f.classList.toggle("off",d.nd);b.textContent=d.nd?"✕ No disponible":"✓ Disponible";marcar(true)});
+function todoDisp(){Object.values(borrador.items).forEach(d=>d.nd=false);sucio=true;renderPanel("ok")}
+async function guardar(){
+  const b=$("guardar");b.disabled=true;b.textContent="Guardando…";
+  const items={};for(const[id,d]of Object.entries(borrador.items)){const p=soloNum(d.precio);if(p||d.nd)items[id]={...(p?{precio:p}:{}),...(d.nd?{nd:true}:{})}}
+  const nuevo={items,actualizado:new Date().toISOString()};
+  const {error}=await db.from("docs").upsert({path:DOC,data:nuevo,updated_at:nuevo.actualizado});
+  b.disabled=false;b.textContent="Guardar";
+  if(error){toast("No se pudo guardar: "+error.message);return}
+  datos=nuevo;marcar(false);renderCarta();toast("Listo, la carta ya está actualizada")}
+function linkCarta(){return location.href.split("#")[0]}
+async function copiar(){const l=linkCarta();try{await navigator.clipboard.writeText(l);toast("Link copiado")}catch{prompt("Copiá este link:",l)}}
+async function salir(){await db.auth.signOut();location.hash=""}
+window.addEventListener("beforeunload",e=>{if(sucio&&document.body.classList.contains("editar")){e.preventDefault();e.returnValue=""}});
+document.addEventListener("submit",async e=>{if(e.target.id!=="login")return;e.preventDefault();
+  $("lBtn").disabled=true;$("lErr").textContent="";
+  const {error}=await db.auth.signInWithPassword({email:$("lEmail").value.trim(),password:$("lPass").value});
+  if(error){$("lBtn").disabled=false;$("lErr").textContent=error.message==="Invalid login credentials"?"El email o la contraseña no coinciden.":error.message}});
+
+async function sesion(s){
+  if(!document.body.classList.contains("editar"))return;
+  if(!s){renderPanel("login");return}
+  const {data}=await db.from("editores").select("rol").eq("email",(s.user.email||"").toLowerCase()).maybeSingle();
+  if(!data||(data.rol&&data.rol!=="admin")){renderPanel("sinpermiso");return}
+  await cargar();borrador=structuredClone(datos);borrador.items??={};sucio=false;renderPanel("ok");
+}
+async function cargar(){if(!db)return;
+  const {data,error}=await db.from("docs").select("data").eq("path",DOC).maybeSingle();
+  if(!error&&data?.data)datos=data.data;datos.items??={}}
+document.addEventListener("click",e=>{const a=e.target.closest("#menu a");if(!a)return;e.preventDefault();
+  document.getElementById(a.getAttribute("href").slice(1))?.scrollIntoView({behavior:"smooth"})});
+function modo(){const ed=location.hash==="#editar";if(modo.ed===ed)return;modo.ed=ed;document.body.classList.toggle("editar",ed);
+  if(ed){if(!db)renderPanel("sinbase");else db.auth.getSession().then(({data})=>sesion(data.session))}
+  else{cargar().then(renderCarta)}}
+
+renderCarta();
+(function(){const C=window.TURNOS_CONFIG||{};
+  if(window.supabase&&C.supabaseUrl&&!C.supabaseUrl.includes("TU-PROYECTO")){db=window.supabase.createClient(C.supabaseUrl,C.supabaseKey);
+    db.auth.onAuthStateChange((ev,s)=>{if(ev==="SIGNED_IN"||ev==="SIGNED_OUT")setTimeout(()=>sesion(s),0)})}
+  window.addEventListener("hashchange",modo);modo()})();
+</script>
+</body>
+</html>

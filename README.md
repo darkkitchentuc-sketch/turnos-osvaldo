@@ -33,3 +33,8 @@ Cada persona pide el cambio en **Cambios de turno** con su DNI. Llega un mail al
 
 ## Niveles de acceso
 Correr `supabase/niveles.sql`. Personal (sin usuario): Calendario, Mi horario, Cambios de turno, Fichadas. Encargado: además Planificar semana y Horario del equipo. Administrador: todo. Los accesos se dan en **Ajustes → Accesos** y el usuario se crea en Supabase → Authentication → Users.
+
+## Carta online
+- Link para mandar a los clientes: `https://darkkitchentuc-sketch.github.io/turnos-osvaldo/carta/`
+- Para actualizar precios y "No disponible": el mismo link con `#editar` al final, ingresando con un usuario **administrador**. Se guarda en Supabase (`docs`, path `carta/osvaldo`); no hace falta correr SQL.
+- Los platos y sus textos están en `carta/index.html` (lista `CARTA`). Cada plato tiene un id fijo donde se guardan su precio y disponibilidad.
