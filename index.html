@@ -250,7 +250,7 @@ input[type=number]{background:var(--surface);border:1px solid var(--line);border
 .milibre{color:var(--off-ink);background:var(--off);border-radius:8px;padding:6px 10px;font-weight:600;font-size:.85rem}
 .miaus{color:var(--amber);background:var(--amber-soft);border-radius:8px;padding:6px 10px;font-weight:600;font-size:.85rem}
 body.solo nav.tabs{display:none}
-body.kiosk .weeknav{visibility:hidden}
+body.kiosk .weeknav,body.kiosk .auth,body.kiosk #sync{display:none}
 /* Fichero */
 .fbox{max-width:440px;margin:0 auto;width:100%;display:grid;gap:12px}
 .fbox input{font-size:1.4rem;padding:10px 12px;letter-spacing:.06em;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;color:inherit;font-family:var(--f-mono)}
@@ -304,7 +304,6 @@ body.ro [data-editonly]{display:none}
     <button role="tab" data-view="equipo" hidden>Horario del equipo</button>
     <button role="tab" data-view="mi">Mi horario</button>
     <button role="tab" data-view="cambios">Cambios de turno</button>
-    <button role="tab" data-view="fichar">Fichadas</button>
     <button role="tab" data-view="ausencias" hidden>Ausencias</button>
     <button role="tab" data-view="personas" hidden>Personas y puestos</button>
     <button role="tab" data-view="horas" hidden>Horas y costos</button>
@@ -511,7 +510,7 @@ function render(){
   // Sin permiso de edición se muestra el calendario, pero se recuerda la pestaña pedida para cuando termine de ingresar.
   const view=canSee(S.view)?S.view:"calendario";
   document.querySelectorAll("nav.tabs button").forEach(b=>b.hidden=!canSee(b.dataset.view));
-  document.body.classList.toggle("solo",S.solo);document.body.classList.toggle("kiosk",view==="fichar");document.body.classList.toggle("ro",!S.canWrite);renderAuth();
+  document.body.classList.toggle("solo",S.solo);document.body.classList.toggle("kiosk",view==="fichar");{const h1=document.querySelector(".brand h1");if(h1)h1.textContent=view==="fichar"?"Fichar · Osvaldo":"Turnos Osvaldo"}document.body.classList.toggle("ro",!S.canWrite);renderAuth();
   document.querySelectorAll("nav.tabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.view===view));
   document.getElementById("weekLabel").textContent=fmtDM(S.week)+" – "+fmtDM(addDays(S.week,6));
   // En la pantalla para fichar no se redibuja, para no borrar lo que la persona está escribiendo.
@@ -1550,6 +1549,8 @@ document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="cxDni
   if(h.startsWith("mi-")){S.view="mi";S.miId=h.slice(3);S.solo=true}
   else if(h==="fichar"){S.view="fichar";S.solo=true}
   else if(VIEWS.includes(h))S.view=h})();
+// Si alguien escribe #fichar en la barra con la app ya abierta, también queda como pantalla independiente.
+addEventListener("hashchange",()=>{if(location.hash==="#fichar"&&S.view!=="fichar"){S.view="fichar";S.solo=true;render()}});
 render();
 document.addEventListener("submit",async e=>{
   if(e.target.id!=="loginForm")return;e.preventDefault();
