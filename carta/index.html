@@ -55,6 +55,12 @@ img{display:block;max-width:100%}
 .estrella{display:inline-block;width:.85em;height:.85em;vertical-align:-.05em;margin-left:.25em;fill:var(--rojo)}
 .precio{flex:none;font-size:13.5px;font-weight:600;letter-spacing:.06em;white-space:nowrap;padding-top:1px}
 .lista.chica .precio{font-size:12px;padding-top:2px}
+.cab{display:flex;align-items:flex-end;gap:12px}
+.cab h2{flex:1}
+.colhead,.precios{flex:none;display:flex;gap:6px}
+.colhead span{width:66px;text-align:right;font-size:10.5px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--azul);padding-bottom:3px}
+.precios .precio{width:66px;text-align:right;font-size:12.5px}
+@media (max-width:400px){.colhead span,.precios .precio{width:60px}.precios .precio{font-size:12px}}
 .nd{flex:none;align-self:flex-start;font-size:8.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--rojo);border:1.3px solid var(--rojo);border-radius:3px;padding:3px 6px 2px;white-space:nowrap;margin-top:1px}
 .plato.agotado .info{opacity:.42}
 
@@ -83,6 +89,8 @@ body.editar .panel{display:block}
 .grupo h3{font-family:var(--tit);color:var(--rojo);font-size:15px;letter-spacing:.06em;text-transform:uppercase;padding-bottom:6px;border-bottom:2px solid #f0d6d3}
 .fila{display:grid;grid-template-columns:1fr 112px auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid #eef0f2}
 .fila .n{font-size:13.5px;line-height:1.3}
+.fila.dos{grid-template-columns:1fr 100px 100px auto}
+.fila .lab{display:grid;gap:3px;font-size:11px;font-weight:600;color:#5b6472;letter-spacing:.06em}
 .fila.off .n{color:#9aa1ab;text-decoration:line-through}
 .pr{display:flex;align-items:center;border:1px solid #cdd3da;border-radius:8px;padding:0 8px;background:#fff}
 .pr span{color:#8a93a0;font-size:15px}
@@ -94,7 +102,7 @@ body.editar .panel{display:block}
 .pie .in{max-width:608px;margin:0 auto;display:flex;align-items:center;gap:12px}
 .pie .est{flex:1;font-size:13px;color:#5b6472}
 .pie .est.mod{color:#b25b00;font-weight:600}
-@media (max-width:480px){.fila{grid-template-columns:1fr auto;row-gap:8px}.fila .n{grid-column:1 / -1}.fila .pr{width:150px}}
+@media (max-width:480px){.fila{grid-template-columns:1fr auto;row-gap:8px}.fila .n{grid-column:1 / -1}.fila .pr{width:150px}.fila.dos{grid-template-columns:1fr 1fr}.fila.dos .pr{width:auto}.fila.dos .tg{grid-column:1 / -1;justify-self:start}}
 .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#1d2430;color:#fff;font-size:14px;padding:10px 16px;border-radius:8px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
 .toast.on{opacity:1}
 </style>
@@ -109,21 +117,21 @@ body.editar .panel{display:block}
 <script>
 /* ===== La carta (textos tal cual el PDF). Cada plato tiene un id fijo: no cambiarlo, ahí se guardan precio y disponibilidad. ===== */
 const CARTA=[
- {hoja:1,id:"bombitas",titulo:"Bombitas",tipo:"desc",platos:[
+ {hoja:1,id:"bombitas",titulo:"Bombitas",tipo:"desc",cols:["x1","x4"],platos:[
   ["bom-carne","Carne","Relleno de carne jugosa y sazonada al estilo casero"],
   ["bom-queso","Queso","Doradas, crujientes y con un centro de queso cremoso"],
   ["bom-jyq","Jamón y queso","Doradas, crujientes y con un centro de queso cremoso y jamón cocido"],
   ["bom-4q","4 quesos","Doradas, crujientes y con un centro de la mezcla perfecta de quesos (azul, cremoso, parmesano y holando)"],
   ["bom-sg","Queso y sin gluten","Doradas, crujientes y con un centro de queso cremoso, sin gluten"]]},
- {hoja:1,id:"empanadas",titulo:"Empanadas fritas",bajada:"También podes pedirlas al horno",platos:[
+ {hoja:1,id:"empanadas",titulo:"Empanadas fritas",cols:["x1","x4"],bajada:"También podes pedirlas al horno",platos:[
   ["emp-picante","Carne picante"],["emp-carne","Carne"],["emp-pollo","Pollo"],["emp-jyq","JyQ"],["emp-humita","Humita"],
   ["emp-ternera","Ternera y queso",null,1],["emp-osobuco","Osobuco al Malbec"]]},
- {hoja:2,id:"milanesas",titulo:"Milanesas",tipo:"desc",bajada:"Donde come 1,comen 2 y donde comen 2 comen 3.<br>También viene con papita o ensalada.",platos:[
+ {hoja:2,id:"milanesas",titulo:"Milanesas",tipo:"desc",cols:["P/1","P/2"],bajada:"Donde come 1,comen 2 y donde comen 2 comen 3.<br>También viene con papita o ensalada.",platos:[
   ["mila-trad","Tradicional","La mila de toda la vida, frita al plato"],
   ["mila-bodegon","De bodegón","Mila frita con su salsa de tomate casera, morrones en conserva artesanal, mozzarella y jamón cocido"],
   ["mila-napo","Napolitana","Mila frita con su salsa de tomate casera, mozzarella y albahacas frescas"],
   ["mila-4q","4 quesos","Mila frita con la mezcla perfecta de quesos (azul,mozzarella,parmesano y holando).",1]]},
- {hoja:2,id:"supremas",titulo:"Supremas",tipo:"desc",bajada:"Donde come 1, comen 2 y donde comen 2, comen 3.<br>También viene con papitas o ensalada.",platos:[
+ {hoja:2,id:"supremas",titulo:"Supremas",tipo:"desc",cols:["P/1","P/2"],bajada:"Donde come 1, comen 2 y donde comen 2, comen 3.<br>También viene con papitas o ensalada.",platos:[
   ["sup-trad","Tradicional","La suprema de toda la vida, frita al plato"],
   ["sup-bodegon","De bodegón","Suprema frita con su salsa de tomate casera, morrones en conserva artesanal, mozzarella y jamón cocido"],
   ["sup-napo","Napolitana","Suprema frita con su salsa de tomate casera, mozzarella y albahacas frescas",1],
@@ -143,8 +151,18 @@ const CARTA=[
   ["ape-carpano","Carpano + soda"],["vin-copa","Copa de vino"],["ape-gin","Gin tonic"]]}
 ];
 const DOC="carta/osvaldo";
+/* Precios de la carta impresa (fotos del 6/11). Se usan solo hasta que se guarde la carta por primera vez desde el panel. */
+const INICIALES={
+ "bom-carne":{precio:"3900",precio2:"13000"},"bom-queso":{precio:"3900",precio2:"13000"},"bom-jyq":{precio:"3900",precio2:"13000"},
+ "bom-4q":{precio:"3900",precio2:"13000"},"bom-sg":{precio:"4100",precio2:"13000"},
+ "emp-picante":{precio:"2300"},"emp-carne":{precio:"2300"},"emp-pollo":{precio:"2300"},"emp-jyq":{precio:"2300"},"emp-humita":{precio:"2300"},"emp-ternera":{precio:"2300"},"emp-osobuco":{precio:"2300"},
+ "mila-trad":{precio:"18000",precio2:"28500"},"mila-bodegon":{precio:"27000",precio2:"39000"},"mila-napo":{precio:"24000",precio2:"37000"},"mila-4q":{precio:"29900",precio2:"43000"},
+ "sup-trad":{precio:"15000",precio2:"25500"},"sup-bodegon":{precio:"23000",precio2:"35000"},"sup-napo":{precio:"21000",precio2:"33000"},"sup-4q":{precio:"26000",precio2:"37000"},
+ "otr-papas":{precio:"8000"},"otr-humita":{precio:"14000"},"otr-lentejas":{precio:"14000"},"otr-tamales":{precio:"12000"},"otr-locro":{precio:"14000"},
+ "pos-budin":{precio:"7000"},"pos-flan":{precio:"7000"},"pos-chocotorta":{precio:"8500"}
+};
 const ESTRELLA='<svg class="estrella" viewBox="0 0 24 24" aria-label="recomendado"><path d="M12 2.5l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7L2 9.7l7.1-.6z"/></svg>';
-let datos={items:{}},db=null;
+let datos={items:structuredClone(INICIALES)},db=null;
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -157,9 +175,10 @@ function fechaAct(){if(!datos.actualizado)return"";const d=new Date(datos.actual
 /* ===== Carta pública ===== */
 function renderCarta(){
   const it=datos.items||{};
-  const plato=([id,nom,des,est],tipo)=>{const d=it[id]||{};const nd=!!d.nd;const p=fmt(d.precio);
-    return `<div class="plato${nd?" agotado":""}"><div class="info"><div class="nom">${esc(nom)}${est?ESTRELLA:""}</div>${des?`<div class="des">${esc(des)}</div>`:""}</div>${nd?'<span class="nd">No disponible</span>':p?`<span class="precio">${p}</span>`:""}</div>`};
-  const sec=s=>`<section class="sec" id="${s.id}"><h2>${esc(s.titulo)}</h2>${s.bajada?`<p class="bajada">${s.bajada}</p>`:""}<div class="lista ${s.tipo||""}">${s.platos.map(p=>plato(p,s.tipo)).join("")}</div></section>`;
+  const plato=([id,nom,des,est],s)=>{const d=it[id]||{};const nd=!!d.nd;const p=fmt(d.precio);
+    const precio=nd?'<span class="nd">No disponible</span>':s.cols?`<div class="precios"><span class="precio">${p}</span><span class="precio">${fmt(d.precio2)}</span></div>`:p?`<span class="precio">${p}</span>`:"";
+    return `<div class="plato${nd?" agotado":""}"><div class="info"><div class="nom">${esc(nom)}${est?ESTRELLA:""}</div>${des?`<div class="des">${esc(des)}</div>`:""}</div>${precio}</div>`};
+  const sec=s=>`<section class="sec" id="${s.id}"><div class="cab"><h2>${esc(s.titulo)}</h2>${s.cols?`<div class="colhead">${s.cols.map(c=>`<span>${esc(c)}</span>`).join("")}</div>`:""}</div>${s.bajada?`<p class="bajada">${s.bajada}</p>`:""}<div class="lista ${s.tipo||""}">${s.platos.map(p=>plato(p,s)).join("")}</div></section>`;
   const cita=`<div class="cita"><p>¿Qué significan las empanadas para Osvaldito?</p><p>Las empanadas son la insignia de Osvaldito. Es el producto que hace mi mamá desde que tengo memoria y, hoy, siguen siendo igual de ricas.</p><img src="img/empanada.png" alt=""></div>`;
   const f=fechaAct();
   $("carta").innerHTML=
@@ -193,21 +212,22 @@ function renderPanel(estado){
    <p class="sub">Cargá el precio de cada plato y tocá el botón para marcarlo <b>No disponible</b>. Después tocá <b>Guardar</b>: el link se actualiza al instante.</p>
    <div class="barra"><a class="btn sec2" href="./" target="_blank">Ver carta</a><button class="btn sec2" onclick="copiar()">Copiar link para mandar</button><button class="btn sec2" onclick="todoDisp()">Poner todo disponible</button><button class="btn sec2" onclick="salir()">Salir</button></div>
    ${CARTA.map(s=>`<div class="grupo"><h3>${esc(s.titulo)}</h3>${s.platos.map(([id,nom])=>{const d=it[id]||{};
-     return `<div class="fila${d.nd?" off":""}" data-id="${id}"><div class="n">${esc(nom)}</div><div class="pr"><span>$</span><input inputmode="numeric" placeholder="Precio" value="${esc(d.precio?Number(soloNum(d.precio)).toLocaleString("es-AR"):"")}" aria-label="Precio de ${esc(nom)}"></div><button class="tg" type="button">${d.nd?"✕ No disponible":"✓ Disponible"}</button></div>`}).join("")}</div>`).join("")}
+     const inp=(k,lab)=>{const v=d[k]?Number(soloNum(d[k])).toLocaleString("es-AR"):"";const box=`<div class="pr"><span>$</span><input inputmode="numeric" data-k="${k}" placeholder="Precio" value="${esc(v)}" aria-label="Precio ${esc(lab||"")} de ${esc(nom)}"></div>`;return lab?`<label class="lab">${esc(lab)}${box}</label>`:box};
+     return `<div class="fila${s.cols?" dos":""}${d.nd?" off":""}" data-id="${id}"><div class="n">${esc(nom)}</div>${s.cols?inp("precio",s.cols[0])+inp("precio2",s.cols[1]):inp("precio")}<button class="tg" type="button">${d.nd?"✕ No disponible":"✓ Disponible"}</button></div>`}).join("")}</div>`).join("")}
    <div class="pie"><div class="in"><div class="est" id="est"></div><button class="btn" id="guardar" onclick="guardar()">Guardar</button></div></div>`;
   marcar(sucio);
 }
 function marcar(v){sucio=v;const e=$("est");if(!e)return;
   e.className="est"+(v?" mod":"");e.textContent=v?"Hay cambios sin guardar":(datos.actualizado?"Guardado · "+fechaAct()+" "+new Date(datos.actualizado).toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"}):"Sin cambios")}
 document.addEventListener("input",e=>{const f=e.target.closest(".fila");if(!f)return;
-  const id=f.dataset.id,n=soloNum(e.target.value);(borrador.items[id]??={}).precio=n;
+  const id=f.dataset.id,n=soloNum(e.target.value);(borrador.items[id]??={})[e.target.dataset.k||"precio"]=n;
   const pos=e.target.value.length-e.target.selectionStart;e.target.value=n?Number(n).toLocaleString("es-AR"):"";const c=Math.max(0,e.target.value.length-pos);e.target.setSelectionRange(c,c);marcar(true)});
 document.addEventListener("click",e=>{const b=e.target.closest(".tg");if(!b)return;const f=b.closest(".fila"),id=f.dataset.id;
   const d=(borrador.items[id]??={});d.nd=!d.nd;f.classList.toggle("off",d.nd);b.textContent=d.nd?"✕ No disponible":"✓ Disponible";marcar(true)});
 function todoDisp(){Object.values(borrador.items).forEach(d=>d.nd=false);sucio=true;renderPanel("ok")}
 async function guardar(){
   const b=$("guardar");b.disabled=true;b.textContent="Guardando…";
-  const items={};for(const[id,d]of Object.entries(borrador.items)){const p=soloNum(d.precio);if(p||d.nd)items[id]={...(p?{precio:p}:{}),...(d.nd?{nd:true}:{})}}
+  const items={};for(const[id,d]of Object.entries(borrador.items)){const p=soloNum(d.precio),p2=soloNum(d.precio2);if(p||p2||d.nd)items[id]={...(p?{precio:p}:{}),...(p2?{precio2:p2}:{}),...(d.nd?{nd:true}:{})}}
   const nuevo={items,actualizado:new Date().toISOString()};
   const {error}=await db.from("docs").upsert({path:DOC,data:nuevo,updated_at:nuevo.actualizado});
   b.disabled=false;b.textContent="Guardar";
